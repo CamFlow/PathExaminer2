@@ -89,6 +89,12 @@ void Evaluator::walkGraph(RichBasicBlock& dest)
 			; //do something because we have found a possible path
 		}
 
+		for (gimple_stmt_iterator it = gsi_start_phis(rbb.getRawBB()) ;
+			!gsi_end_p(it);
+			gsi_next(&it)) {
+			gimple stmt = gsi_stmt(it);
+			k << stmt;
+		}
 		for (gimple_stmt_iterator it = gsi_start_bb(rbb.getRawBB()) ;
 			!gsi_end_p(it);
 			gsi_next(&it)) {
