@@ -7,8 +7,10 @@
 #include <map>
 #include <functional>
 #include <memory>
+#include <stack>
 
 #include "evaluator.h"
+#include "configuration.h"
 
 Evaluator::Evaluator()
 {
@@ -30,7 +32,7 @@ void Evaluator::evaluateAllPaths()
 	for (RichBasicBlock& flowBB : _bbsWithFlows) {
 		_graph.clear();
 		buildSubGraph(flowBB);
-		walkGraph();
+		walkGraph(flowBB);
 	}
 }
 
@@ -39,7 +41,9 @@ void Evaluator::buildSubGraph(RichBasicBlock& start)
 	std::map<std::reference_wrapper<RichBasicBlock>,Color,RichBasicBlockLess> colors;
 
 	for (auto&& rbb : _allbbs)
-		if (rbb.second.hasLSMNode())
+		if (rbb.first == ENTRY_BLOCK_PTR)
+			colors[rbb.second] = Color::GREEN;
+		else if (rbb.second.hasLSMNode())
 			colors[rbb.second] = Color::RED;
 		else
 			colors[rbb.second] = Color::WHITE;
@@ -72,7 +76,53 @@ void Evaluator::dfs_visit(std::pair<const basic_block,RichBasicBlock>& bb, std::
 	}
 }
 
-void Evaluator::walkGraph()
+void Evaluator::walkGraph(RichBasicBlock& dest)
 {
+	std::stack<std::pair<RichBasicBlock&,Configuration>> walk;
+	walk.emplace(_allbbs.at(ENTRY_BLOCK_PTR),Configuration());
+	while (!walk.empty()) {
+		RichBasicBlock& rbb = walk.top().first;
+		Configuration& k = walk.top().second;
+		walk.pop();
 
+		if (rbb == dest) {
+			; //do something because we have found a possible path
+		}
+
+		for (gimple_stmt_iterator it = gsi_start_bb(rbb.getRawBB()) ;
+			!gsi_end_p(it);
+			gsi_next(&it)) {
+			gimple stmt = gsi_stmt(it);
+			k << stmt;
+		}
+
+		for (auto&& succ : _graph[rbb]) { //for all successors of current bb
+			const Constraint& c = rbb.getConstraintForSucc(succ);
+			Configuration newk{k};
+			newk << c;
+			if (newk)
+				walk.emplace(succ, std::move(newk));
+			// else : abandon the path, the resulting configuration is invalid
+		}
+	}
+}
+
+Configuration& operator<<(Configuration& k, gimple stmt)
+{
+	switch (gimple_code(stmt)) {
+		default:
+			; //nothing to do
+	}
+	return k;
+}
+
+Configuration& operator<<(Configuration& k, const Constraint& c)
+{
+	switch (c.rel) {
+		default:
+			; //we should probably raise an exception here
+			  //it means that we don't handle one of the operator
+			  //or that we mis-parsed the constraint
+	}
+	return k;
 }

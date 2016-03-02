@@ -24,10 +24,11 @@ RichBasicBlock::RichBasicBlock(basic_block bb) :
 	edge succ;
 	edge_iterator succ_it;
 	FOR_EACH_EDGE(succ, succ_it, _bb->succs)
-		_succs.emplace_back(succ->src, Constraint(succ));
+		_succs.emplace(succ->src, Constraint(succ));
 }
 
-bool matchLSM(tree fndecl) {
+bool matchLSM(tree fndecl)
+{
 	if (!fndecl)
 		return false;
 
@@ -40,7 +41,19 @@ bool matchLSM(tree fndecl) {
 	return false;
 }
 
-bool matchFlow(gimple stmt) {
+bool matchFlow(gimple stmt)
+{
 	// ??
 	return stmt;
+}
+
+bool operator==(const RichBasicBlock& bb1, const RichBasicBlock& bb2)
+{
+	return bb1._bb == bb2._bb;
+}
+
+const Constraint& RichBasicBlock::getConstraintForSucc(const RichBasicBlock& succ) const
+{
+	return _succs.at(succ.getRawBB()); //throws an error if bb is not found
+					   //it should NEVER be the case
 }

@@ -21,7 +21,8 @@ libkayrebt_pathexaminer2_la_SOURCES= constraint.cpp\
 	value_factory.cpp    \
 	value_factory.h      \
 	bad_tree_exception.h \
-	bad_tree_exception.cpp
+	bad_tree_exception.cpp\
+	configuration.h
 libkayrebt_pathexaminer2_la_CXXFLAGS = -std=c++11 -I @gcc_includes@
 libkayrebt_pathexaminer2_la_LDFLAGS  = -version-info 1:0:0
 #libkayrebt_pathexaminer2_la_LIBADD =

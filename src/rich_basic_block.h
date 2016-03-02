@@ -1,17 +1,20 @@
+#ifndef RICH_BASIC_BLOCK_H
+#define RICH_BASIC_BLOCK_H
+
 #include <gcc-plugin.h>
 #include <basic-block.h>
 #include <tree.h>
 #include <gimple.h>
 
 #include <tuple>
-#include <vector>
+#include <map>
 
 #include "constraint.h"
 
 class RichBasicBlock {
 private:
 	basic_block _bb;
-	std::vector<std::pair<basic_block,Constraint>> _succs;
+	std::map<basic_block,Constraint> _succs;
 	struct {
 		bool has_flow : 1;
 		bool has_lsm  : 1;
@@ -24,4 +27,9 @@ public:
 	bool hasFlowNode() const { return _status.has_flow; }
 	bool hasLSMNode() const { return _status.has_lsm; }
 	const basic_block& getRawBB() const;
+	const Constraint& getConstraintForSucc(const RichBasicBlock& succ) const;
+
+friend bool operator==(const RichBasicBlock&, const RichBasicBlock&);
 };
+
+#endif /* ifndef RICH_BASIC_BLOCK_H */
