@@ -37,7 +37,4 @@ class Evaluator {
 		std::map<std::reference_wrapper<RichBasicBlock>,std::vector<RichBasicBlock>,RichBasicBlockLess> _graph;
 };
 
-Configuration& operator<<(Configuration& k, gimple stmt);
-Configuration& operator<<(Configuration& k, const Constraint& c);
-
 #endif /* ifndef EVALUATOR_H */
