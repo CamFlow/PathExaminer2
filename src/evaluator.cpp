@@ -52,17 +52,34 @@ void Evaluator::buildSubGraph(RichBasicBlock& start)
 	dfs_visit(firstVisited, colors);
 }
 
+	// The resulting subgraph is the subgraph comprising the root node,
+	// the starting node and every nodes and edges belonging to paths
+	// from the root to the starting node that do not contain any RED node
 void Evaluator::dfs_visit(std::pair<const basic_block,RichBasicBlock>& bb, std::map<std::reference_wrapper<RichBasicBlock>,Color,RichBasicBlockLess> colors)
 {
 	colors[bb.second] = Color::GRAY;
 	bool at_least_one_pred_green = false;
 	edge e;
 	edge_iterator it;
+
+	// GREEN : node we want in the result subgraph
+	// RED : node we don't want
+	// WHITE : node undiscovered
+	// GRAY : node discovered, but with predecessors undiscovered yet
+	// The root node is GREEN, some nodes are RED, the starting node is WHITE
 	FOR_EACH_EDGE(e,it,bb.first->preds) {
 		auto p = _allbbs.find(e->src);
+		// if the node we just discovered is new, then we must explore
+		// it first before deciding the state of the current node
 		if (colors[p->second] == Color::WHITE)
 			dfs_visit(*p, colors);
-		if (colors[p->second] == Color::GREEN) {
+		// if we point to a GREEN node (e.g. the root, then we are
+		// ourselves a GREEN node)
+		// we keep also edges pointing to GRAY nodes (edges poiting
+		// backward in the path we are currently exploring)
+		// we remove them in a second pass if they're not interesting
+		if (colors[p->second] == Color::GREEN ||
+		    colors[p->second] == Color::GRAY) {
 			auto succs = _graph.find(p->second);
 			if (succs == _graph.cend())
 				succs = _graph.emplace(p->second,std::vector<RichBasicBlock>()).first;
@@ -73,6 +90,23 @@ void Evaluator::dfs_visit(std::pair<const basic_block,RichBasicBlock>& bb, std::
 			colors[bb.second] = Color::GREEN;
 		else
 			colors[bb.second] = Color::RED;
+	}
+
+	// Remove backward edges in a second pass if we now can decide that they
+	// point to a RED node
+	for (auto& p: _graph) {
+		auto it = p.second.rbegin();
+		auto save = it;
+		while (it != p.second.rend()) {
+			if (colors[*it] == Color::RED) {
+				save = it;
+				++save;
+				p.second.erase(it.base());
+				it = save;
+			} else {
+				++it;
+			}
+		}
 	}
 }
 
