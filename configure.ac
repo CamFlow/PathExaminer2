@@ -53,6 +53,7 @@ AC_CHECK_HEADER_STDBOOL
 AC_TYPE_SIZE_T
 
 # Checks for library functions.
+AC_CHECK_LIB([yices],[yices_init])
 AC_CONFIG_FILES([Makefile src/Makefile])
 #AC_SUBST([YAML_CPP_CFLAGS])
 #AC_SUBST([YAML_CPP_LIBS])

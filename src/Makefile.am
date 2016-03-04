@@ -25,7 +25,7 @@ libkayrebt_pathexaminer2_la_SOURCES= constraint.cpp\
 	configuration.h
 libkayrebt_pathexaminer2_la_CXXFLAGS = -std=c++11 -I @gcc_includes@
 libkayrebt_pathexaminer2_la_LDFLAGS  = -version-info 1:0:0
-#libkayrebt_pathexaminer2_la_LIBADD =
+libkayrebt_pathexaminer2_la_LIBADD = -lyices
 
 install-exec-local:
 	$(RM) `$(CC) -print-file-name=plugin`/kayrebt_pathexaminer2.so || true

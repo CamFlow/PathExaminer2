@@ -7,9 +7,9 @@
 #include <string>
 
 struct Constraint {
-	std::string lhs;
+	tree lhs;
 	tree_code rel = MAX_TREE_CODES;
-	std::string rhs;
+	tree rhs;
 
 	Constraint() = default;
 	Constraint(edge e);
