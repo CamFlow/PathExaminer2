@@ -5,8 +5,13 @@
 
 #include <assert.h>
 #include "constraint.h"
-#include "value.h"
-#include "value_factory.h"
+
+
+Constraint::Constraint(tree lhs, tree_code rel, tree rhs) :
+	lhs(lhs),
+	rel(rel),
+	rhs(rhs)
+{}
 
 Constraint::Constraint(edge e)
 {

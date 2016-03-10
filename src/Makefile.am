@@ -3,26 +3,13 @@ libkayrebt_pathexaminer2_la_SOURCES= constraint.cpp\
 	constraint.h         \
 	evaluator.cpp        \
 	evaluator.h          \
-	identifier.cpp       \
-	identifier.h         \
-	integer_cst.cpp      \
-	integer_cst.h        \
 	oracle.h             \
 	path.h               \
 	path_evaluator.cpp   \
 	rich_basic_block.cpp \
 	rich_basic_block.h   \
-	ssa_name.cpp         \
-	ssa_name.h           \
-	string_cst.cpp       \
-	string_cst.h         \
-	value.cpp            \
-	value.h              \
-	value_factory.cpp    \
-	value_factory.h      \
-	bad_tree_exception.h \
-	bad_tree_exception.cpp\
-	configuration.h
+	configuration.h\
+	configuration.cpp
 libkayrebt_pathexaminer2_la_CXXFLAGS = -std=c++11 -I @gcc_includes@
 libkayrebt_pathexaminer2_la_LDFLAGS  = -version-info 1:0:0
 libkayrebt_pathexaminer2_la_LIBADD = -lyices

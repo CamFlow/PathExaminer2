@@ -139,6 +139,20 @@ void Evaluator::walkGraph(RichBasicBlock& dest)
 		for (auto&& succ : _graph[rbb]) { //for all successors of current bb
 			const Constraint& c = rbb.getConstraintForSucc(succ);
 			Configuration newk{k};
+
+			// find the index of the edge in succ->pred we are
+			// traversing to get from rbb to succ
+			// This is needed to correctly interpret the Phi nodes
+			// in succ
+			edge_iterator it;
+			edge e;
+			unsigned int edgeIndex = 0;
+			FOR_EACH_EDGE(e, it, succ.getRawBB()->preds) {
+				if (e->src == rbb.getRawBB())
+					break;
+				edgeIndex++;
+			}
+			newk.setPredecessorInfo(rbb.getRawBB(),edgeIndex);
 			newk << c;
 			if (newk)
 				walk.emplace(succ, std::move(newk));

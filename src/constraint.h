@@ -13,6 +13,7 @@ struct Constraint {
 
 	Constraint() = default;
 	Constraint(edge e);
+	Constraint(tree lhs, tree_code rel, tree rhs);
 };
 
 #endif /* ifndef CONSTRAINT_H */
