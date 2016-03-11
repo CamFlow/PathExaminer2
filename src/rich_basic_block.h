@@ -12,20 +12,21 @@
 #include "constraint.h"
 
 class RichBasicBlock {
-private:
+protected:
 	basic_block _bb;
 	std::map<basic_block,Constraint> _succs;
-	struct {
-		bool has_flow : 1;
-		bool has_lsm  : 1;
-	} _status;
-	bool matchLSM(tree fndecl) const;
-	bool matchFlow(gimple stmt) const;
+	bool _hasFlow;
+	bool _hasLSM;
+	static std::tuple<bool,bool> isLSMorFlowBB(basic_block bb);
+	static bool matchLSM(tree fndecl);
+	static bool matchFlow(gimple stmt);
+
+	RichBasicBlock() = default;
 
 public:
 	RichBasicBlock(basic_block bb);
-	bool hasFlowNode() const { return _status.has_flow; }
-	bool hasLSMNode() const { return _status.has_lsm; }
+	bool hasFlowNode() const { return _hasFlow; }
+	bool hasLSMNode() const { return _hasLSM; }
 	const basic_block& getRawBB() const;
 	const Constraint& getConstraintForSucc(const RichBasicBlock& succ) const;
 

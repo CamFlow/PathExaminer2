@@ -1,16 +1,20 @@
 #include <cstdlib>
+#include <cassert>
 #include <gcc-plugin.h>
 #include <function.h>
 #include <tree-flow.h>
 #include <basic-block.h>
+#include <cfgloop.h>
 
 #include <map>
 #include <functional>
 #include <memory>
 #include <stack>
+#include <set>
 
 #include "evaluator.h"
 #include "configuration.h"
+#include "loop_basic_block.h"
 
 Evaluator::Evaluator()
 {
@@ -36,6 +40,68 @@ void Evaluator::evaluateAllPaths()
 	}
 }
 
+void Evaluator::buildLoop(basic_block bb)
+{
+	assert(bb_loop_depth(bb) > 0);
+
+	struct loop* l = loop_outermost(bb->loop_father);
+	basic_block* loopBBs = get_loop_body_in_dom_order(l);
+
+	std::set<tree> clobberedVars;
+	bool clobbersAllVarMems = 0;
+	for (unsigned int i = 0 ; i < l->num_nodes ; i++) {
+		basic_block bb = loopBBs[i];
+		for (gimple_stmt_iterator it = gsi_start_phis(bb) ;
+			!gsi_end_p(it);
+			gsi_next(&it)) {
+			gimple stmt = gsi_stmt(it);
+			clobberedVars.insert(gimple_phi_result(stmt));
+		}
+		for (gimple_stmt_iterator it = gsi_start_bb(bb) ;
+			!gsi_end_p(it);
+			gsi_next(&it)) {
+			gimple stmt = gsi_stmt(it);
+			tree lhs;
+			switch (gimple_code(stmt)) {
+				case GIMPLE_ASSIGN:
+					lhs = gimple_assign_lhs(stmt);
+					clobbersAllVarMems = !is_gimple_reg(lhs);
+					clobberedVars.insert(lhs);
+					break;
+				case GIMPLE_CALL:
+					lhs = gimple_call_lhs(stmt);
+					if (lhs && lhs != NULL_TREE)
+						clobberedVars.insert(lhs);
+					//fallthrough
+				case GIMPLE_ASM:
+					clobbersAllVarMems = true;
+					break;
+
+				// control flow stmts are irrelevant
+				case GIMPLE_COND:
+				case GIMPLE_LABEL:
+				case GIMPLE_GOTO:
+				case GIMPLE_SWITCH:
+					break;
+
+				default:
+					break;
+			}
+		}
+	}
+
+	std::vector<std::pair<basic_block,Constraint>> exits;
+	unsigned int i;
+	edge e;
+	vec<edge> exitEdges = get_loop_exit_edges(l);
+	FOR_EACH_VEC_ELT(exitEdges, i, e)
+		exits.emplace_back(e->dest, Constraint(e));
+	LoopBasicBlock lbb(loopBBs, l->num_nodes, std::move(clobberedVars),
+			std::move(exits));
+	if (clobbersAllVarMems)
+		lbb.setClobbersAllMemVars();
+}
+
 void Evaluator::buildSubGraph(RichBasicBlock& start)
 {
 	std::map<std::reference_wrapper<RichBasicBlock>,Color,RichBasicBlockLess> colors;
@@ -55,7 +121,7 @@ void Evaluator::buildSubGraph(RichBasicBlock& start)
 	// The resulting subgraph is the subgraph comprising the root node,
 	// the starting node and every nodes and edges belonging to paths
 	// from the root to the starting node that do not contain any RED node
-void Evaluator::dfs_visit(std::pair<const basic_block,RichBasicBlock>& bb, std::map<std::reference_wrapper<RichBasicBlock>,Color,RichBasicBlockLess> colors)
+void Evaluator::dfs_visit(std::pair<const basic_block,RichBasicBlock>& bb, std::map<std::reference_wrapper<RichBasicBlock>,Color,RichBasicBlockLess>& colors)
 {
 	colors[bb.second] = Color::GRAY;
 	bool at_least_one_pred_green = false;

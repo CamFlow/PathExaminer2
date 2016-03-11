@@ -11,20 +11,29 @@ RichBasicBlock::RichBasicBlock(basic_block bb) :
 	if (bb == ENTRY_BLOCK_PTR || bb == EXIT_BLOCK_PTR)
 		return;
 
-	for (gimple_stmt_iterator it = gsi_start_bb(bb) ;
-		!gsi_end_p(it) ;
-		gsi_next(&it)) {
-		gimple stmt = gsi_stmt(it);
-		if (gimple_code(stmt) == GIMPLE_CALL) {
-			_status.has_lsm = matchLSM(gimple_call_fndecl(stmt));
-		}
-		_status.has_flow = matchFlow(stmt);
-	}
+	std::tie(_hasLSM,_hasFlow) = isLSMorFlowBB(_bb);
 
 	edge succ;
 	edge_iterator succ_it;
 	FOR_EACH_EDGE(succ, succ_it, _bb->succs)
 		_succs.emplace(succ->src, Constraint(succ));
+}
+
+std::tuple<bool,bool> RichBasicBlock::isLSMorFlowBB(basic_block bb)
+{
+	bool isLSM = false;
+	bool isFlow = false;
+	for (gimple_stmt_iterator it = gsi_start_bb(bb) ;
+		!gsi_end_p(it) ;
+		gsi_next(&it)) {
+		gimple stmt = gsi_stmt(it);
+		if (gimple_code(stmt) == GIMPLE_CALL) {
+			isLSM = matchLSM(gimple_call_fndecl(stmt));
+		}
+		isFlow = matchFlow(stmt);
+	}
+
+	return std::make_tuple(isLSM, isFlow);
 }
 
 bool matchLSM(tree fndecl)

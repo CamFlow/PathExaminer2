@@ -29,9 +29,11 @@ class Evaluator {
 			}
 		};
 
+		void buildLoop(basic_block bb);
+
 		void buildSubGraph(RichBasicBlock& start);
 		void walkGraph(RichBasicBlock& destination);
-		void dfs_visit(std::pair<const basic_block,RichBasicBlock>& bb, std::map<std::reference_wrapper<RichBasicBlock>,Color,RichBasicBlockLess> colors);
+		void dfs_visit(std::pair<const basic_block,RichBasicBlock>& bb, std::map<std::reference_wrapper<RichBasicBlock>,Color,RichBasicBlockLess>& colors);
 		std::map<basic_block,RichBasicBlock> _allbbs;
 		std::vector<std::reference_wrapper<RichBasicBlock>> _bbsWithFlows;
 		std::map<std::reference_wrapper<RichBasicBlock>,std::vector<RichBasicBlock>,RichBasicBlockLess> _graph;
