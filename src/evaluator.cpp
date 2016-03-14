@@ -23,7 +23,10 @@ Evaluator::Evaluator()
 		if (bb == EXIT_BLOCK_PTR) //we need ENTRY but not EXIT
 			continue;
 
-		RichBasicBlock& rbb = _allbbs.emplace(bb,bb).first->second;
+		RichBasicBlock& rbb = bb->loop_father ?
+			buildLoop(bb) :
+			_allbbs.emplace(bb,bb).first->second;
+
 		if (rbb.hasFlowNode())
 			_bbsWithFlows.push_back(rbb);
 		if (rbb.hasLSMNode())
@@ -40,7 +43,7 @@ void Evaluator::evaluateAllPaths()
 	}
 }
 
-void Evaluator::buildLoop(basic_block bb)
+LoopBasicBlock& Evaluator::buildLoop(basic_block bb)
 {
 	assert(bb_loop_depth(bb) > 0);
 
@@ -65,7 +68,7 @@ void Evaluator::buildLoop(basic_block bb)
 			switch (gimple_code(stmt)) {
 				case GIMPLE_ASSIGN:
 					lhs = gimple_assign_lhs(stmt);
-					clobbersAllVarMems = !is_gimple_reg(lhs);
+					clobbersAllVarMems = POINTER_TYPE_P(TREE_TYPE(lhs));
 					clobberedVars.insert(lhs);
 					break;
 				case GIMPLE_CALL:
@@ -96,10 +99,14 @@ void Evaluator::buildLoop(basic_block bb)
 	vec<edge> exitEdges = get_loop_exit_edges(l);
 	FOR_EACH_VEC_ELT(exitEdges, i, e)
 		exits.emplace_back(e->dest, Constraint(e));
-	LoopBasicBlock lbb(loopBBs, l->num_nodes, std::move(clobberedVars),
-			std::move(exits));
+	LoopBasicBlock& lbb = static_cast<LoopBasicBlock&>(_allbbs.emplace(
+			l->header,
+			LoopBasicBlock(loopBBs, l->num_nodes,
+				std::move(clobberedVars), std::move(exits))
+			).first->second);
 	if (clobbersAllVarMems)
 		lbb.setClobbersAllMemVars();
+	return lbb;
 }
 
 void Evaluator::buildSubGraph(RichBasicBlock& start)
@@ -114,16 +121,15 @@ void Evaluator::buildSubGraph(RichBasicBlock& start)
 		else
 			colors[rbb.second] = Color::WHITE;
 
-	std::pair<const basic_block,RichBasicBlock> firstVisited = std::make_pair(start.getRawBB(), start);
-	dfs_visit(firstVisited, colors);
+	dfs_visit(start, colors);
 }
 
 	// The resulting subgraph is the subgraph comprising the root node,
 	// the starting node and every nodes and edges belonging to paths
 	// from the root to the starting node that do not contain any RED node
-void Evaluator::dfs_visit(std::pair<const basic_block,RichBasicBlock>& bb, std::map<std::reference_wrapper<RichBasicBlock>,Color,RichBasicBlockLess>& colors)
+void Evaluator::dfs_visit(RichBasicBlock& bb, std::map<std::reference_wrapper<RichBasicBlock>,Color,RichBasicBlockLess>& colors)
 {
-	colors[bb.second] = Color::GRAY;
+	colors[bb] = Color::GRAY;
 	bool at_least_one_pred_green = false;
 	edge e;
 	edge_iterator it;
@@ -133,29 +139,37 @@ void Evaluator::dfs_visit(std::pair<const basic_block,RichBasicBlock>& bb, std::
 	// WHITE : node undiscovered
 	// GRAY : node discovered, but with predecessors undiscovered yet
 	// The root node is GREEN, some nodes are RED, the starting node is WHITE
-	FOR_EACH_EDGE(e,it,bb.first->preds) {
-		auto p = _allbbs.find(e->src);
+	FOR_EACH_EDGE(e,it,bb.getRawBB()->preds) {
+		basic_block pred = e->src;
+		// if we are in a loop, we must jump to the header
+		// to fetch the LoopBasicBlock
+		if (pred->loop_father)
+			pred = loop_outermost(pred->loop_father)->header;
+
+		auto p = _allbbs.at(pred); //better to just crash at this point
+		                           //if p is NOT in the map
+
 		// if the node we just discovered is new, then we must explore
 		// it first before deciding the state of the current node
-		if (colors[p->second] == Color::WHITE)
-			dfs_visit(*p, colors);
+		if (colors[p] == Color::WHITE)
+			dfs_visit(p, colors);
 		// if we point to a GREEN node (e.g. the root, then we are
 		// ourselves a GREEN node)
 		// we keep also edges pointing to GRAY nodes (edges poiting
 		// backward in the path we are currently exploring)
 		// we remove them in a second pass if they're not interesting
-		if (colors[p->second] == Color::GREEN ||
-		    colors[p->second] == Color::GRAY) {
-			auto succs = _graph.find(p->second);
+		if (colors[p] == Color::GREEN ||
+		    colors[p] == Color::GRAY) {
+			auto succs = _graph.find(p);
 			if (succs == _graph.cend())
-				succs = _graph.emplace(p->second,std::vector<RichBasicBlock>()).first;
-			succs->second.push_back(bb.second);
+				succs = _graph.emplace(p,std::vector<RichBasicBlock>()).first;
+			succs->second.push_back(bb);
 			at_least_one_pred_green = true;
 		}
 		if (at_least_one_pred_green)
-			colors[bb.second] = Color::GREEN;
+			colors[bb] = Color::GREEN;
 		else
-			colors[bb.second] = Color::RED;
+			colors[bb] = Color::RED;
 	}
 
 	// Remove backward edges in a second pass if we now can decide that they
@@ -186,7 +200,7 @@ void Evaluator::walkGraph(RichBasicBlock& dest)
 		walk.pop();
 
 		if (rbb == dest) {
-			; //do something because we have found a possible path
+			; //TODO do something because we have found a possible path
 		}
 
 		for (gimple_stmt_iterator it = gsi_start_phis(rbb.getRawBB()) ;
