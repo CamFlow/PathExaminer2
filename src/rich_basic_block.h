@@ -25,6 +25,7 @@ protected:
 
 public:
 	RichBasicBlock(basic_block bb);
+	virtual ~RichBasicBlock();
 	bool hasFlowNode() const { return _hasFlow; }
 	bool hasLSMNode() const { return _hasLSM; }
 	const basic_block& getRawBB() const;
