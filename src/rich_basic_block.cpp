@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cstring>
 #include <gcc-plugin.h>
 #include <gimple.h>
 #include <basic-block.h>
@@ -52,8 +53,18 @@ bool matchLSM(tree fndecl)
 
 bool matchFlow(gimple stmt)
 {
-	// ??
-	return stmt;
+	if (gimple_code(stmt) != GIMPLE_CALL)
+		return false;
+
+	tree fn = gimple_call_fndecl(stmt);
+	if (!fn || fn == NULL_TREE)
+		return false;
+
+	fn = DECL_NAME(fn);
+	if (!fn || fn == NULL_TREE)
+		return false;
+
+	return strcmp(IDENTIFIER_POINTER(fn),"kayrebt_FlowNodeMarker") == 0;
 }
 
 bool operator==(const RichBasicBlock& bb1, const RichBasicBlock& bb2)

@@ -14,6 +14,7 @@ struct Constraint {
 	Constraint() = default;
 	Constraint(edge e);
 	Constraint(tree lhs, tree_code rel, tree rhs);
+	friend bool operator<(const Constraint& c1, const Constraint& c2);
 };
 
 #endif /* ifndef CONSTRAINT_H */

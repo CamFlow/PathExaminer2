@@ -16,8 +16,7 @@ struct Constraint;
 
 struct ValueRange
 {
-	std::vector<Constraint> _constraints;
-	std::vector<term_t> _terms;
+	std::map<Constraint,term_t> _constraints;
 
 	void addConstraint(const Constraint& c);
 
@@ -28,14 +27,12 @@ struct ValueRange
 class Configuration
 {
 	private:
-		std::map<tree,ValueRange> _varsMem;
-		std::map<tree,ValueRange> _varsTemp;
+		ValueRange _allConstraints;
 		static std::map<tree,std::string> _strings;
 		std::map<tree,tree> _ptrDestination;
 		unsigned int _indexLastEdgeTaken;
 		basic_block _lastBB;
 
-		ValueRange& getValueRangeForVar(tree var);
 		const type_t Yices_int{yices_int_type()};
 
 		void doGimpleAssign(gimple stmt);
@@ -43,11 +40,12 @@ class Configuration
 		void doGimpleCall(gimple stmt);
 
 	public:
+		Configuration();
 		static const std::string& strForTree(tree t);
 		explicit operator bool();
 		void resetVar(tree var);
 		void resetAllVarMem();
-		void addConstraint(const Constraint& c);
+		bool tryAddConstraint(const Constraint& c);
 		void setPredecessorInfo(basic_block bb, unsigned int edgeTaken)
 		{ 
 			_lastBB = bb;

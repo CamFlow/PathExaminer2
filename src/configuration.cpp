@@ -7,12 +7,19 @@
 #include <function.h>
 #include <tree-flow.h>
 #include <tree-flow-inline.h>
+#include <tree-ssa-alias.h>
 
 #include <memory>
 
 #include "configuration.h"
 #include "constraint.h"
 
+Configuration::Configuration() :
+	_indexLastEdgeTaken{0},
+	_lastBB{ENTRY_BLOCK_PTR}
+{
+	compute_may_aliases(); //needed for the points-to oracle
+}
 
 Configuration& Configuration::operator<<(gimple stmt)
 {
@@ -37,7 +44,6 @@ Configuration& Configuration::operator<<(gimple stmt)
 
 Configuration& Configuration::operator<<(const Constraint& c)
 {
-	ValueRange& v = getValueRangeForVar(c.lhs);
 	switch (c.rel) {
 		case EQ_EXPR:
 		case NE_EXPR:
@@ -45,7 +51,7 @@ Configuration& Configuration::operator<<(const Constraint& c)
 		case LE_EXPR:
 		case GT_EXPR:
 		case GE_EXPR:
-			v.addConstraint(c);
+			tryAddConstraint(c);
 			break;
 		default:
 			; //we should probably raise an exception here
@@ -59,79 +65,91 @@ void Configuration::doGimpleCall(gimple stmt)
 {
 	tree lhs = gimple_call_lhs(stmt);
 	if (lhs && lhs != NULL_TREE)
-		getValueRangeForVar(lhs)._constraints.clear();
+		resetVar(lhs);
+
 	resetAllVarMem();
 }
 
 void Configuration::doGimpleAssign(gimple stmt)
 {
-	if (gimple_num_ops(stmt) > 2)
-		return; //we cannot do nothing if stmt is
+	if (!gimple_assign_copy_p(stmt))
+		return; //we can do nothing if stmt is
 			//more than a simple assignment
 	tree lhs = gimple_assign_lhs(stmt);
 	tree rhs = gimple_assign_rhs1(stmt);
 
-	// TODO the following is not correct, we have to erase all constraints
-	// concerning lhs, not only those with lhs on the left-hand sides of
-	// constraints
-	if (!is_gimple_reg(lhs)) {
+	if (INDIRECT_REF_P(lhs)) { //this is a mem node
+		tree pointer = TREE_OPERAND(lhs, 0);
+		auto it = _ptrDestination.find(pointer);
+		if (it != _ptrDestination.end()) {
+			resetVar(it->second);
+			tryAddConstraint(Constraint(it->second,EQ_EXPR,rhs));
+		} else {
+			pt_solution& ptSol = get_ptr_info(pointer)->pt;
+			auto mayDeref = [&ptSol,&pointer](tree var) -> bool {
+				if (ptSol.escaped || ptSol.anything)
+					return alias_sets_conflict_p(get_alias_set(var),get_deref_alias_set(pointer));
+				else
+					return bitmap_bit_p(ptSol.vars, DECL_PT_UID(var));
+			};
+
+			unsigned int ix;
+			tree var;
+			FOR_EACH_LOCAL_DECL(cfun, ix, var) {
+				if (mayDeref(var)) {
+					resetVar(var);
+				}
+			}
+		}
+	} else {
 		resetVar(lhs);
+		tryAddConstraint(Constraint(lhs,EQ_EXPR,rhs));
 	}
-	ValueRange& val = getValueRangeForVar(lhs);
-	val.addConstraint(Constraint(lhs,EQ_EXPR,rhs));
 }
 
 void Configuration::doGimplePhi(gimple stmt)
 {
-	if (gimple_num_ops(stmt) > 2)
-		return; //we cannot do nothing if stmt is
-			//more than a simple assignment
 	tree lhs = gimple_phi_result(stmt);
 	tree rhs = gimple_phi_arg_def(stmt, _indexLastEdgeTaken);
 
 
-	// TODO the following is not correct, we have to erase all constraints
-	// concerning lhs, not only those with lhs on the left-hand sides of
-	// constraints
-	if (!is_gimple_reg(lhs)) {
-		resetVar(lhs);
-	}
-	ValueRange& val = getValueRangeForVar(lhs);
-	val.addConstraint(Constraint(lhs,EQ_EXPR,rhs));
+	resetVar(lhs);
+	tryAddConstraint(Constraint(lhs,EQ_EXPR,rhs));
 }
 
 void ValueRange::addConstraint(const Constraint& c)
 {
 	const std::map<tree_code, term_t(*)(term_t,term_t)> ops{
 		{GT_EXPR,  yices_arith_gt_atom},
-			{LT_EXPR,  yices_arith_lt_atom},
-			{GE_EXPR,  yices_arith_geq_atom},
-			{LE_EXPR,  yices_arith_leq_atom},
-			{EQ_EXPR,  yices_arith_eq_atom},
-			{NE_EXPR,  yices_arith_neq_atom}
+		{LT_EXPR,  yices_arith_lt_atom},
+		{GE_EXPR,  yices_arith_geq_atom},
+		{LE_EXPR,  yices_arith_leq_atom},
+		{EQ_EXPR,  yices_arith_eq_atom},
+		{NE_EXPR,  yices_arith_neq_atom}
 	};
+	term_t t;
 
 	if (is_gimple_variable(c.rhs))
-		_terms.push_back(
-				ops.at(c.rel)(
-					yices_get_term_by_name(Configuration::strForTree(c.lhs).c_str()),
-					yices_get_term_by_name(Configuration::strForTree(c.rhs).c_str()))
-				);
+		t = ops.at(c.rel)(
+			yices_get_term_by_name(Configuration::strForTree(c.lhs).c_str()),
+			yices_get_term_by_name(Configuration::strForTree(c.rhs).c_str()));
 	else if (TREE_CODE(c.rhs) == INTEGER_CST)
-		_terms.push_back(
-				ops.at(c.rel)(
-					yices_get_term_by_name(Configuration::strForTree(c.lhs).c_str()),
-					yices_int64(TREE_INT_CST_HIGH(c.rhs) << 32) + TREE_INT_CST_LOW(c.rhs))
-				);
+		t = ops.at(c.rel)(
+			yices_get_term_by_name(Configuration::strForTree(c.lhs).c_str()),
+			yices_int64(TREE_INT_CST_HIGH(c.rhs) << 32) + TREE_INT_CST_LOW(c.rhs));
 	else
 		return; // otherwise we don't know what lhs is compared to
-	_constraints.push_back(c);
+
+	_constraints.emplace(c,t);
 }
 
 ValueRange::operator bool()
 {
-	return checkVectorOfConstraints(_terms);
-
+	std::vector<term_t> terms;
+	std::transform(_constraints.begin(), _constraints.end(),
+			std::back_inserter(terms),
+			[](const std::pair<Constraint,term_t>& p) { return p.second; } );
+	return checkVectorOfConstraints(terms);
 }
 
 bool ValueRange::checkVectorOfConstraints(std::vector<term_t>& terms)
@@ -148,61 +166,60 @@ bool ValueRange::checkVectorOfConstraints(std::vector<term_t>& terms)
 }
 
 Configuration::operator bool() {
-	std::vector<term_t> all_constraints;
-	for (auto&& p : _varsMem)
-		for (term_t& t : p.second._terms)
-			all_constraints.emplace_back(t);
-	for (auto&& p : _varsTemp)
-		for (term_t& t : p.second._terms)
-			all_constraints.emplace_back(t);
-	return ValueRange::checkVectorOfConstraints(all_constraints);
-}
-
-ValueRange& Configuration::getValueRangeForVar(tree var) {
-	std::map<tree,ValueRange>& map = is_gimple_reg(var) ? _varsMem : _varsTemp;
-
-	auto it = map.find(var);
-	if (it == map.end()) {
-		term_t res = yices_new_uninterpreted_term(Yices_int);
-		std::string name;
-		yices_set_term_name(res, name.c_str());
-		it = map.emplace(var,ValueRange()).first;
-	}
-
-	return it->second;
+	return bool(_allConstraints);
 }
 
 void Configuration::resetVar(tree var) {
-	auto it = _varsMem.find(var);
-	if (it != _varsMem.end())
-		it->second._constraints.clear();
-
-	it = _varsTemp.find(var);
-	if (it != _varsTemp.end())
-		it->second._constraints.clear();
-
 	// erase all constraints about var everywhere
+	std::map<Constraint,term_t>& constraints = _allConstraints._constraints;
+	for (auto it = constraints.begin() ; it != constraints.end() ;)
+	{
+		const Constraint& c = it->first;
+		if (c.lhs == var || c.rhs == var)
+			it = constraints.erase(it);
+		else
+			++it;
+	}
 
+	//if var is a pointer, we lose the information about its value
+	_ptrDestination.erase(var);
 }
 
 void Configuration::resetAllVarMem()
 {
-	for (auto it = _ptrDestination.begin() ; it != _ptrDestination.end() ; )
+	std::map<Constraint,term_t>& constraints = _allConstraints._constraints;
+	for (auto it = constraints.begin() ; it != constraints.end() ;)
 	{
-		const tree ptr = it->first;
-		if(_varsMem.find(ptr) != _varsMem.end())
-			_ptrDestination.erase(it++);
+		const Constraint& c = it->first;
+		if (is_gimple_reg(c.lhs) && is_gimple_reg(c.rhs))
+			++it;
 		else
-			it++;
+			it = constraints.erase(it);
 	}
 
-	for (auto& p : _varsMem)
-		p.second._constraints.clear();
+	for (auto it = _ptrDestination.begin() ; it != _ptrDestination.end() ;)
+	{
+		const tree pointer = it->first;
+		if (is_gimple_reg(pointer))
+			++it;
+		else
+			it = _ptrDestination.erase(it);
+	}
 }
 
-void Configuration::addConstraint(const Constraint& c) {
-	ValueRange& r = getValueRangeForVar(c.lhs);
-	r.addConstraint(c);
+bool Configuration::tryAddConstraint(const Constraint& c)
+{
+	if (!SSA_VAR_P(c.lhs) && !SSA_VAR_P(c.rhs))
+		return false;
+
+	if (is_global_var(c.lhs) || is_global_var(c.rhs))
+		return false;
+
+	if ((DECL_P(c.lhs) && TREE_THIS_VOLATILE(c.lhs)) ||
+	    (DECL_P(c.rhs) && TREE_THIS_VOLATILE(c.rhs)))
+		return false;
+
+	_allConstraints.addConstraint(c);
 
 	//Special case : int* p; int v; p = &v;
 	//we want to remember that *p is aliased to v
@@ -210,6 +227,8 @@ void Configuration::addConstraint(const Constraint& c) {
 	    c.rel == EQ_EXPR) {
 		_ptrDestination[c.lhs] = c.rhs;
 	}
+
+	return true;
 }
 
 const std::string& Configuration::strForTree(tree t)

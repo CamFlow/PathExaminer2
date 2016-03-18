@@ -4,6 +4,9 @@
 #include <tree-flow.h>
 
 #include <assert.h>
+
+#include <tuple>
+
 #include "constraint.h"
 
 
@@ -32,4 +35,9 @@ Constraint::Constraint(edge e)
 				gimple_cond_code(last) == GT_EXPR ? GE_EXPR :
 				                                    GT_EXPR;
 	}
+}
+
+bool operator<(const Constraint& c1, const Constraint& c2)
+{
+	return std::tie(c1.lhs,c1.rel,c1.rhs) < std::tie(c2.lhs,c2.rel,c2.rhs);
 }
