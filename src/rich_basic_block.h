@@ -6,6 +6,7 @@
 #include <tree.h>
 #include <gimple.h>
 
+#include <iostream>
 #include <tuple>
 #include <map>
 
@@ -18,20 +19,20 @@ protected:
 	bool _hasFlow;
 	bool _hasLSM;
 	static std::tuple<bool,bool> isLSMorFlowBB(basic_block bb);
-	static bool matchLSM(tree fndecl);
-	static bool matchFlow(gimple stmt);
+	virtual void print(std::ostream& o) const;
 
 	RichBasicBlock() = default;
 
 public:
 	RichBasicBlock(basic_block bb);
-	virtual ~RichBasicBlock();
+	virtual ~RichBasicBlock() = default;
 	bool hasFlowNode() const { return _hasFlow; }
 	bool hasLSMNode() const { return _hasLSM; }
-	const basic_block& getRawBB() const;
+	const basic_block& getRawBB() const { return _bb; }
 	const Constraint& getConstraintForSucc(const RichBasicBlock& succ) const;
 
 friend bool operator==(const RichBasicBlock&, const RichBasicBlock&);
+friend std::ostream& operator<<(std::ostream& o, const RichBasicBlock& rbb);
 };
 
 #endif /* ifndef RICH_BASIC_BLOCK_H */

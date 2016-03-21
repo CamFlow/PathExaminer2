@@ -1,5 +1,5 @@
 #ifndef CONSTRAINT_H
-#define CONSTRAINT_H value
+#define CONSTRAINT_H
 
 #include <gcc-plugin.h>
 #include <basic-block.h>

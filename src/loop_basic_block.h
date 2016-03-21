@@ -21,6 +21,7 @@ private:
 public:
 	LoopBasicBlock(basic_block* loopBody, size_t size, std::set<tree>&& clobberedVars, std::vector<std::pair<basic_block,Constraint>>&& exitConstraints);
 	~LoopBasicBlock();
+	virtual void print(std::ostream& o) const override;
 	void setClobbersAllMemVars() { _clobbersMemVars = true; }
 	bool getClobbersAllMemVars() { return _clobbersMemVars; }
 };

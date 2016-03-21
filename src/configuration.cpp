@@ -14,6 +14,8 @@
 #include "configuration.h"
 #include "constraint.h"
 
+std::map<tree,std::string> Configuration::_strings;
+
 Configuration::Configuration() :
 	_indexLastEdgeTaken{0},
 	_lastBB{ENTRY_BLOCK_PTR}

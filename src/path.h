@@ -1,3 +1,6 @@
+#ifndef PATH_H
+#define PATH_H
+
 #include <vector>
 #include <string>
 
@@ -12,3 +15,4 @@ private:
 public:
 	std::string getConstraint();
 };
+#endif /* ifndef PATH_H */

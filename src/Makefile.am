@@ -1,5 +1,6 @@
 lib_LTLIBRARIES=libkayrebt_pathexaminer2.la
-libkayrebt_pathexaminer2_la_SOURCES= constraint.cpp\
+libkayrebt_pathexaminer2_la_SOURCES=\
+	constraint.cpp       \
 	constraint.h         \
 	evaluator.cpp        \
 	evaluator.h          \
@@ -8,10 +9,10 @@ libkayrebt_pathexaminer2_la_SOURCES= constraint.cpp\
 	path_evaluator.cpp   \
 	rich_basic_block.cpp \
 	rich_basic_block.h   \
-	configuration.h\
 	configuration.cpp    \
-	loop_basic_block.h   \
-	loop_basic_block.cpp
+	configuration.h      \
+	loop_basic_block.cpp \
+	loop_basic_block.h
 
 libkayrebt_pathexaminer2_la_CXXFLAGS = -std=c++11 -I @gcc_includes@
 libkayrebt_pathexaminer2_la_LDFLAGS  = -version-info 1:0:0

@@ -14,7 +14,9 @@ LoopBasicBlock::LoopBasicBlock(basic_block* loopBody, size_t size, std::set<tree
 	for (auto&& p : exitConstraints)
 		_succs.insert(p);
 
-	_bb = nullptr;
+	_bb = loopBody[0];
+	_hasLSM =false;
+	_hasFlow = false;
 
 	for (unsigned int i=0 ; i<_size ; i++) {
 		bool lsm, flow;
@@ -27,4 +29,10 @@ LoopBasicBlock::LoopBasicBlock(basic_block* loopBody, size_t size, std::set<tree
 LoopBasicBlock::~LoopBasicBlock()
 {
 	free(_loopBody);
+}
+
+void LoopBasicBlock::print(std::ostream& o) const
+{
+	o << "(LoopBasicBlock)";
+	this->RichBasicBlock::print(o);
 }

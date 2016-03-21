@@ -4,7 +4,9 @@
 #include <vector>
 #include <functional>
 #include <map>
+#include <set>
 #include <utility>
+#include <memory>
 
 #include "path.h"
 #include "rich_basic_block.h"
@@ -30,14 +32,14 @@ class Evaluator {
 			}
 		};
 
-		LoopBasicBlock& buildLoop(basic_block bb);
+		LoopBasicBlock* buildLoop(basic_block bb);
 
-		void buildSubGraph(RichBasicBlock& start);
-		void walkGraph(RichBasicBlock& destination);
-		void dfs_visit(RichBasicBlock& bb, std::map<std::reference_wrapper<RichBasicBlock>,Color,RichBasicBlockLess>& colors);
-		std::map<basic_block,RichBasicBlock> _allbbs;
-		std::vector<std::reference_wrapper<RichBasicBlock>> _bbsWithFlows;
-		std::map<std::reference_wrapper<RichBasicBlock>,std::vector<RichBasicBlock>,RichBasicBlockLess> _graph;
+		void buildSubGraph(RichBasicBlock* start);
+		void walkGraph(RichBasicBlock* destination);
+		void dfs_visit(RichBasicBlock* bb, std::map<RichBasicBlock*,Color>& colors);
+		std::map<basic_block,std::unique_ptr<RichBasicBlock>> _allbbs;
+		std::set<RichBasicBlock*> _bbsWithFlows;
+		std::map<RichBasicBlock*,std::vector<RichBasicBlock*>> _graph;
 };
 
 #endif /* ifndef EVALUATOR_H */

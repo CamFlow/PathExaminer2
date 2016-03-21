@@ -136,7 +136,7 @@ extern "C" int plugin_init (struct plugin_name_args *plugin_info,
 					plugin_name, argv[i].key);
 	}
 
-	fprintf(dump_file, "I'm alive!\n");
+//	fprintf(dump_file, "I'm alive!\n");
 
 	register_callback(plugin_name,
 			PLUGIN_PASS_MANAGER_SETUP,
