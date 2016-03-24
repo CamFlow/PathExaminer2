@@ -5,6 +5,7 @@
 #include <tree-flow.h>
 #include <basic-block.h>
 #include <cfgloop.h>
+#include <tree-ssa-alias.h>
 
 #include <iostream>
 #include <map>
@@ -13,12 +14,17 @@
 #include <stack>
 #include <set>
 
+#include <yices.h>
+
 #include "evaluator.h"
 #include "configuration.h"
 #include "loop_basic_block.h"
 
 Evaluator::Evaluator()
 {
+	yices_init();
+	compute_may_aliases(); //needed for the points-to oracle
+
 	std::cerr << "Building the rich basic blocks" << std::endl;
 	basic_block bb;
 	FOR_ALL_BB(bb) {
@@ -37,9 +43,15 @@ Evaluator::Evaluator()
 	}
 }
 
+Evaluator::~Evaluator()
+{
+	yices_exit();
+}
+
 void Evaluator::evaluateAllPaths()
 {
-	std::cerr << "There are " << _bbsWithFlows.size() << " bbs with flow nodes" << std::endl;
+	std::cerr << "There are " << _bbsWithFlows.size()
+		  << " bbs with flow nodes" << std::endl;
 	for (RichBasicBlock* flowBB : _bbsWithFlows) {
 		std::cerr << "Examining " << *flowBB << std::endl;
 		_graph.clear();
@@ -60,7 +72,7 @@ void Evaluator::evaluateAllPaths()
 					  << "] ";
 			std::cerr << ")" << std::endl;
 		}
-//		walkGraph(flowBB);
+		walkGraph(flowBB);
 	}
 }
 
@@ -75,66 +87,15 @@ LoopBasicBlock* Evaluator::buildLoop(basic_block bb)
 	if (it != _allbbs.end())
 		return static_cast<LoopBasicBlock*>(it->second.get());
 
-	basic_block* loopBBs = get_loop_body_in_dom_order(l);
-
-	std::set<tree> clobberedVars;
-	bool clobbersAllVarMems = 0;
-	for (unsigned int i = 0 ; i < l->num_nodes ; i++) {
-		basic_block bb = loopBBs[i];
-		for (gimple_stmt_iterator it = gsi_start_phis(bb) ;
-			!gsi_end_p(it);
-			gsi_next(&it)) {
-			gimple stmt = gsi_stmt(it);
-			clobberedVars.insert(gimple_phi_result(stmt));
-		}
-		for (gimple_stmt_iterator it = gsi_start_bb(bb) ;
-			!gsi_end_p(it);
-			gsi_next(&it)) {
-			gimple stmt = gsi_stmt(it);
-			tree lhs;
-			switch (gimple_code(stmt)) {
-				case GIMPLE_ASSIGN:
-					lhs = gimple_assign_lhs(stmt);
-					clobbersAllVarMems = POINTER_TYPE_P(TREE_TYPE(lhs));
-					clobberedVars.insert(lhs);
-					break;
-				case GIMPLE_CALL:
-					lhs = gimple_call_lhs(stmt);
-					if (lhs && lhs != NULL_TREE)
-						clobberedVars.insert(lhs);
-					//fallthrough
-				case GIMPLE_ASM:
-					clobbersAllVarMems = true;
-					break;
-
-				// control flow stmts are irrelevant
-				case GIMPLE_COND:
-				case GIMPLE_LABEL:
-				case GIMPLE_GOTO:
-				case GIMPLE_SWITCH:
-					break;
-
-				default:
-					break;
-			}
-		}
-	}
-
-	std::vector<std::pair<basic_block,Constraint>> exits;
-	unsigned int i;
-	edge e;
-	vec<edge> exitEdges = get_loop_exit_edges(l);
-	FOR_EACH_VEC_ELT(exitEdges, i, e)
-		exits.emplace_back(e->dest, Constraint(e));
-	LoopBasicBlock* lbb = static_cast<LoopBasicBlock*>(_allbbs.emplace(
+	LoopBasicBlock* lbb = static_cast<LoopBasicBlock*>(
+		_allbbs.emplace(
 			l->header,
 			std::unique_ptr<RichBasicBlock>(
-				new LoopBasicBlock(loopBBs, l->num_nodes,
-				std::move(clobberedVars), std::move(exits)))
-			).first->second.get());
-	std::cerr << "Loop added for basic_block " << l->header->index << " (header)" << std::endl;
-	if (clobbersAllVarMems)
-		lbb->setClobbersAllMemVars();
+				new LoopBasicBlock(l))
+		).first->second.get());
+
+	std::cerr << "Loop added for basic_block " << l->header->index
+		  << " (header)" << std::endl;
 	return lbb;
 }
 
@@ -229,15 +190,18 @@ void Evaluator::dfs_visit(RichBasicBlock* bb, std::map<RichBasicBlock*,Color>& c
 
 void Evaluator::walkGraph(RichBasicBlock* dest)
 {
+	std::cerr << "Starting the walk until " << *dest << std::endl;
 	std::stack<std::pair<RichBasicBlock*,Configuration>> walk;
 	walk.emplace(_allbbs.at(ENTRY_BLOCK_PTR).get(),Configuration());
 	while (!walk.empty()) {
 		RichBasicBlock* rbb = walk.top().first;
-		Configuration& k = walk.top().second;
+		std::cerr << "Reached " << *rbb << std::endl;
+		Configuration k = std::move(walk.top().second);
 		walk.pop();
 
 		if (rbb == dest) {
-			; //TODO do something because we have found a possible path
+			std::cerr << "Found a path" << std::endl;
+			//TODO do something because we have found a possible path
 		}
 
 		for (gimple_stmt_iterator it = gsi_start_phis(rbb->getRawBB()) ;
@@ -250,29 +214,26 @@ void Evaluator::walkGraph(RichBasicBlock* dest)
 			!gsi_end_p(it);
 			gsi_next(&it)) {
 			gimple stmt = gsi_stmt(it);
+			std::cerr << "Next statement : " << gimple_code_name[gimple_code(stmt)] << std::endl;
 			k << stmt;
 		}
+		std::cerr << "Handled all statements" << std::endl;
 
 		for (const auto& succ : _graph[rbb]) { //for all successors of current bb
-			const Constraint& c = rbb->getConstraintForSucc(*succ);
-			Configuration newk{k};
-
-			// find the index of the edge in succ->pred we are
-			// traversing to get from rbb to succ
-			// This is needed to correctly interpret the Phi nodes
-			// in succ
-			edge_iterator it;
+			std::cerr << *succ << " is a valid successor" << std::endl;
 			edge e;
-			unsigned int edgeIndex = 0;
-			FOR_EACH_EDGE(e, it, succ->getRawBB()->preds) {
-				if (e->src == rbb->getRawBB())
-					break;
-				edgeIndex++;
-			}
-			newk.setPredecessorInfo(rbb->getRawBB(),edgeIndex);
+			Constraint c;
+			std::tie(e,c) = rbb->getConstraintForSucc(*succ);
+			std::cerr << "extracted the constraint for successor " << *succ << std::endl;
+			Configuration newk{k};
+			std::cerr << "Configuration copied" << std::endl;
+
+			newk.setPredecessorInfo(rbb->getRawBB(),e->dest_idx);
+			std::cerr << "Copy of configuration initialized" << std::endl;
 			newk << c;
+			std::cerr << "Constraint added to configuration" << std::endl;
 			if (newk)
-				walk.emplace(succ, std::move(newk));
+				walk.emplace(succ, newk);
 			// else : abandon the path, the resulting configuration is invalid
 		}
 	}

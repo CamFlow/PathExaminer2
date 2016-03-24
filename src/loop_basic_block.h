@@ -5,9 +5,13 @@
 #include <basic-block.h>
 #include <tree.h>
 #include <gimple.h>
+#include <tree-flow.h>
+#include <basic-block.h>
+#include <cfgloop.h>
 
 #include <set>
 #include <vector>
+#include <tuple>
 
 #include "rich_basic_block.h"
 
@@ -19,7 +23,7 @@ private:
 	bool _clobbersMemVars = false;
 
 public:
-	LoopBasicBlock(basic_block* loopBody, size_t size, std::set<tree>&& clobberedVars, std::vector<std::pair<basic_block,Constraint>>&& exitConstraints);
+	LoopBasicBlock(struct loop* l);
 	~LoopBasicBlock();
 	virtual void print(std::ostream& o) const override;
 	void setClobbersAllMemVars() { _clobbersMemVars = true; }

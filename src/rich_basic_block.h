@@ -15,7 +15,7 @@
 class RichBasicBlock {
 protected:
 	basic_block _bb;
-	std::map<basic_block,Constraint> _succs;
+	std::map<basic_block,std::tuple<edge,Constraint>> _succs;
 	bool _hasFlow;
 	bool _hasLSM;
 	static std::tuple<bool,bool> isLSMorFlowBB(basic_block bb);
@@ -24,12 +24,12 @@ protected:
 	RichBasicBlock() = default;
 
 public:
-	RichBasicBlock(basic_block bb);
+	explicit RichBasicBlock(basic_block bb);
 	virtual ~RichBasicBlock() = default;
 	bool hasFlowNode() const { return _hasFlow; }
 	bool hasLSMNode() const { return _hasLSM; }
 	const basic_block& getRawBB() const { return _bb; }
-	const Constraint& getConstraintForSucc(const RichBasicBlock& succ) const;
+	std::tuple<const edge,const Constraint&> getConstraintForSucc(const RichBasicBlock& succ) const;
 
 friend bool operator==(const RichBasicBlock&, const RichBasicBlock&);
 friend std::ostream& operator<<(std::ostream& o, const RichBasicBlock& rbb);

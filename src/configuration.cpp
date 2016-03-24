@@ -1,6 +1,13 @@
 #include <algorithm>
 #include <iostream>
+#include <memory>
+#include <utility>
+#include <vector>
+#include <map>
+#include <functional>
 
+#include <cassert>
+#include <cstring>
 #include <gcc-plugin.h>
 #include <gimple.h>
 #include <tree.h>
@@ -9,10 +16,10 @@
 #include <tree-flow-inline.h>
 #include <tree-ssa-alias.h>
 
-#include <memory>
-
 #include "configuration.h"
 #include "constraint.h"
+
+const type_t Configuration::YICES_INT{yices_int_type()};
 
 std::map<tree,std::string> Configuration::_strings;
 
@@ -20,7 +27,7 @@ Configuration::Configuration() :
 	_indexLastEdgeTaken{0},
 	_lastBB{ENTRY_BLOCK_PTR}
 {
-	compute_may_aliases(); //needed for the points-to oracle
+	std::cerr << "Configuration created, _constraints size: " << _constraints.size() << std::endl;
 }
 
 Configuration& Configuration::operator<<(gimple stmt)
@@ -74,13 +81,17 @@ void Configuration::doGimpleCall(gimple stmt)
 
 void Configuration::doGimpleAssign(gimple stmt)
 {
-	if (!gimple_assign_copy_p(stmt))
+	if (gimple_assign_single_p(stmt)) {
+		std::cerr << "the statement has several rhs args" << std::endl;
 		return; //we can do nothing if stmt is
-			//more than a simple assignment
+			//more than a simple copy (e.g. if it's an operation)
+	}
+
 	tree lhs = gimple_assign_lhs(stmt);
 	tree rhs = gimple_assign_rhs1(stmt);
 
-	if (INDIRECT_REF_P(lhs)) { //this is a mem node
+	if (INDIRECT_REF_P(lhs) || TREE_CODE(lhs) == MEM_REF
+		|| TREE_CODE(lhs) == TARGET_MEM_REF) { //this is a mem node
 		tree pointer = TREE_OPERAND(lhs, 0);
 		auto it = _ptrDestination.find(pointer);
 		if (it != _ptrDestination.end()) {
@@ -103,9 +114,13 @@ void Configuration::doGimpleAssign(gimple stmt)
 				}
 			}
 		}
-	} else {
+	} else if (is_gimple_variable(lhs)) {
+		std::cerr << strForTree(lhs) << " is a variable" << std::endl;
 		resetVar(lhs);
-		tryAddConstraint(Constraint(lhs,EQ_EXPR,rhs));
+		if (!gimple_clobber_p(stmt))
+			tryAddConstraint(Constraint(lhs,EQ_EXPR,rhs));
+	} else {
+		throw std::runtime_error(std::string("Unhandled assignment: ") + tree_code_name[TREE_CODE(lhs)]);
 	}
 }
 
@@ -114,14 +129,13 @@ void Configuration::doGimplePhi(gimple stmt)
 	tree lhs = gimple_phi_result(stmt);
 	tree rhs = gimple_phi_arg_def(stmt, _indexLastEdgeTaken);
 
-
-	resetVar(lhs);
-	tryAddConstraint(Constraint(lhs,EQ_EXPR,rhs));
+	if (is_gimple_reg(lhs)) //dont care about .MEM phi nodes
+		tryAddConstraint(Constraint(lhs,EQ_EXPR,rhs));
 }
 
-void ValueRange::addConstraint(const Constraint& c)
+void Configuration::doAddConstraint(Constraint c)
 {
-	const std::map<tree_code, term_t(*)(term_t,term_t)> ops{
+	static const std::map<tree_code, term_t(*)(term_t,term_t)> ops{
 		{GT_EXPR,  yices_arith_gt_atom},
 		{LT_EXPR,  yices_arith_lt_atom},
 		{GE_EXPR,  yices_arith_geq_atom},
@@ -131,32 +145,40 @@ void ValueRange::addConstraint(const Constraint& c)
 	};
 	term_t t;
 
-	if (is_gimple_variable(c.rhs))
-		t = ops.at(c.rel)(
-			yices_get_term_by_name(Configuration::strForTree(c.lhs).c_str()),
-			yices_get_term_by_name(Configuration::strForTree(c.rhs).c_str()));
-	else if (TREE_CODE(c.rhs) == INTEGER_CST)
-		t = ops.at(c.rel)(
-			yices_get_term_by_name(Configuration::strForTree(c.lhs).c_str()),
-			yices_int64(TREE_INT_CST_HIGH(c.rhs) << 32) + TREE_INT_CST_LOW(c.rhs));
-	else
-		return; // otherwise we don't know what lhs is compared to
+	t = ops.at(c.rel)(
+		Configuration::getNormalizedTerm(c.lhs),
+		Configuration::getNormalizedTerm(c.rhs)
+	);
+	std::cerr << "After normalization, new constraint: " << std::endl;
+	yices_pp_term(stderr, t, 40, 1, 0);
 
-	_constraints.emplace(c,t);
+	std::cerr << "Constraint about to be inserted, size: " << _constraints.size() << std::endl;
+	for (const auto& p : _constraints) {
+		std::cerr << "\t";
+		yices_pp_term(stderr, p.second, 40, 1, 0);
+	}
+	_constraints.emplace_back(std::move(c),t);
+	std::cerr << "Constraint inserted, size: " << _constraints.size() << std::endl;
 }
 
-ValueRange::operator bool()
+Configuration::operator bool()
 {
 	std::vector<term_t> terms;
-	std::transform(_constraints.begin(), _constraints.end(),
+	std::cerr << "Building the set of constraints" << std::endl;
+	std::transform(_constraints.cbegin(), _constraints.cend(),
 			std::back_inserter(terms),
-			[](const std::pair<Constraint,term_t>& p) { return p.second; } );
+			[](const std::pair<Constraint,term_t>& p) {
+				return p.second;
+			}
+	);
+	std::cerr << "Set of constraints built" << std::endl;
 	return checkVectorOfConstraints(terms);
 }
 
-bool ValueRange::checkVectorOfConstraints(std::vector<term_t>& terms)
+bool Configuration::checkVectorOfConstraints(std::vector<term_t>& terms)
 {
 	term_t conjunct = yices_and(terms.size(), terms.data());
+	yices_pp_term(stderr, conjunct, 120, 50, 0);
 	auto context_deleter = [](context_t* c) { yices_free_context(c); };
 	std::unique_ptr<context_t,decltype(context_deleter)&> ctx{yices_new_context(nullptr), context_deleter};
 	int code = yices_assert_formula(ctx.get(), conjunct);
@@ -164,24 +186,25 @@ bool ValueRange::checkVectorOfConstraints(std::vector<term_t>& terms)
 		yices_print_error(stderr);
 		throw std::runtime_error("Assert failed on formula");
 	}
-	return yices_check_context(ctx.get(), nullptr) & (STATUS_SAT | STATUS_UNKNOWN);
-}
+	bool res = yices_check_context(ctx.get(), nullptr) & (STATUS_SAT | STATUS_UNKNOWN);
 
-Configuration::operator bool() {
-	return bool(_allConstraints);
+	if (res)
+		std::cerr << "Yices says satisfiable" << std::endl;
+	else
+		std::cerr << "Yices says unsatisfiable" << std::endl;
+	return res;
 }
 
 void Configuration::resetVar(tree var) {
 	// erase all constraints about var everywhere
-	std::map<Constraint,term_t>& constraints = _allConstraints._constraints;
-	for (auto it = constraints.begin() ; it != constraints.end() ;)
-	{
-		const Constraint& c = it->first;
-		if (c.lhs == var || c.rhs == var)
-			it = constraints.erase(it);
-		else
-			++it;
-	}
+	_constraints.erase(
+		std::remove_if(_constraints.begin(), _constraints.end(),
+			[&var](const std::pair<Constraint,term_t>& p) {
+				const Constraint& c = p.first;
+				return (c.lhs == var || c.rhs == var);
+			}),
+		_constraints.end()
+	);
 
 	//if var is a pointer, we lose the information about its value
 	_ptrDestination.erase(var);
@@ -189,15 +212,16 @@ void Configuration::resetVar(tree var) {
 
 void Configuration::resetAllVarMem()
 {
-	std::map<Constraint,term_t>& constraints = _allConstraints._constraints;
-	for (auto it = constraints.begin() ; it != constraints.end() ;)
-	{
-		const Constraint& c = it->first;
-		if (is_gimple_reg(c.lhs) && is_gimple_reg(c.rhs))
-			++it;
-		else
-			it = constraints.erase(it);
-	}
+	_constraints.erase(
+		std::remove_if(_constraints.begin(), _constraints.end(),
+			[](const std::pair<Constraint,term_t>& p) {
+				const Constraint& c = p.first;
+				return (!is_gimple_reg(c.lhs) ||
+				        (is_gimple_variable(c.rhs) && !is_gimple_reg(c.rhs)));
+			}),
+		_constraints.end()
+	);
+
 
 	for (auto it = _ptrDestination.begin() ; it != _ptrDestination.end() ;)
 	{
@@ -207,28 +231,50 @@ void Configuration::resetAllVarMem()
 		else
 			it = _ptrDestination.erase(it);
 	}
+
 }
 
-bool Configuration::tryAddConstraint(const Constraint& c)
+bool Configuration::tryAddConstraint(Constraint c)
 {
-	if (!SSA_VAR_P(c.lhs) && !SSA_VAR_P(c.rhs))
-		return false;
+	std::cerr << "Trying to add a constraint about " << strForTree(c.lhs)
+		  << "\n\tlhs tree code: " << tree_code_name[TREE_CODE(c.lhs)]
+		  << "\n\trhs tree code: " << tree_code_name[TREE_CODE(c.rhs)]
+		  << std::endl;
 
-	if (is_global_var(c.lhs) || is_global_var(c.rhs))
-		return false;
-
-	if ((DECL_P(c.lhs) && TREE_THIS_VOLATILE(c.lhs)) ||
-	    (DECL_P(c.rhs) && TREE_THIS_VOLATILE(c.rhs)))
-		return false;
-
-	_allConstraints.addConstraint(c);
+	c.lhs = STRIP_USELESS_TYPE_CONVERSION(c.lhs);
+	c.rhs = STRIP_USELESS_TYPE_CONVERSION(c.rhs);
 
 	//Special case : int* p; int v; p = &v;
 	//we want to remember that *p is aliased to v
 	if (POINTER_TYPE_P(TREE_TYPE(c.lhs)) &&
-	    c.rel == EQ_EXPR) {
-		_ptrDestination[c.lhs] = c.rhs;
+	    c.rel == EQ_EXPR &&
+	    TREE_CODE(c.rhs) == ADDR_EXPR) {
+		_ptrDestination.emplace(c.lhs,TREE_OPERAND(c.rhs,0));
+		return true;
 	}
+
+	if (!is_gimple_variable(c.lhs) &&
+	    !is_gimple_variable(c.rhs) &&
+	    (TREE_CODE(c.rhs) != INTEGER_CST)) {
+		std::cerr << "Bad nodes" << std::endl;
+		return false;
+	}
+
+	if ((DECL_P(c.lhs) && is_global_var(c.lhs)) ||
+            (DECL_P(c.rhs) && is_gimple_variable(c.rhs) && is_global_var(c.rhs))) {
+		std::cerr << "Cannot handle global vars" << std::endl;
+		return false;
+	}
+
+	if ((DECL_P(c.lhs) && TREE_THIS_VOLATILE(c.lhs)) ||
+	    (DECL_P(c.rhs) && TREE_THIS_VOLATILE(c.rhs))) {
+		std::cerr << "Cannot handle volatile" << std::endl;
+		return false;
+	}
+
+	std::cerr << "Constraint accepted" << std::endl;
+
+	doAddConstraint(c);
 
 	return true;
 }
@@ -245,14 +291,14 @@ const std::string& Configuration::strForTree(tree t)
 	std::string res;
 	if (TREE_CODE(t) == SSA_NAME) {
 		tree name = SSA_NAME_IDENTIFIER(t);
-		if (!name || name == NULL_TREE)
+		if (!name || name == NULL_TREE || strlen(IDENTIFIER_POINTER(name)) == 0)
 			res = "<ssa " + std::to_string(ssaCounter++) + ">";
 		else
 			res = IDENTIFIER_POINTER(name);
 		res += "." + std::to_string(SSA_NAME_VERSION(t));
 	} else if (TREE_CODE(t) == VAR_DECL) {
 		tree name = DECL_NAME(t);
-		if (!name || name == NULL_TREE)
+		if (!name || name == NULL_TREE || strlen(IDENTIFIER_POINTER(name)) == 0)
 			res = "<var " + std::to_string(varCounter++) + ">";
 		else
 			res = IDENTIFIER_POINTER(name);
@@ -260,5 +306,25 @@ const std::string& Configuration::strForTree(tree t)
 		std::cerr << "Warning: trying to get a name for " << tree_code_name[TREE_CODE(t)] << std::endl;
 	}
 
-	return _strings.emplace(t,std::move(res)).first->second;
+	return _strings.insert(std::make_pair(t,res)).first->second;
+}
+
+term_t Configuration::getNormalizedTerm(tree t)
+{
+	assert (t && t != NULL_TREE);
+	term_t res = NULL_TERM;
+	if (is_gimple_variable(t)) {
+		std::string s = strForTree(t);
+		res = yices_get_term_by_name(s.c_str());
+		if (res == NULL_TERM) {
+			res = yices_new_uninterpreted_term(YICES_INT);
+			yices_set_term_name(res, s.c_str());
+		}
+	} else if (TREE_CODE(t) == INTEGER_CST) {
+		res = yices_int64(TREE_INT_CST(t).to_shwi());
+	}
+	std::cerr << "Normalized term " << strForTree(t) << std::endl;
+	yices_pp_term(stderr, res, 120, 50, 0);
+
+	return res;
 }

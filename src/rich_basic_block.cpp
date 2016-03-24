@@ -4,6 +4,8 @@
 #include <gimple.h>
 #include <basic-block.h>
 
+#include <tuple>
+
 #include "rich_basic_block.h"
 
 RichBasicBlock::RichBasicBlock(basic_block bb) :
@@ -27,7 +29,7 @@ RichBasicBlock::RichBasicBlock(basic_block bb) :
 	edge succ;
 	edge_iterator succ_it;
 	FOR_EACH_EDGE(succ, succ_it, _bb->succs)
-		_succs.emplace(succ->src, Constraint(succ));
+		_succs.emplace(succ->dest, std::forward_as_tuple(succ, Constraint(succ)));
 }
 
 std::tuple<bool,bool> RichBasicBlock::isLSMorFlowBB(basic_block bb)
@@ -65,7 +67,7 @@ bool operator==(const RichBasicBlock& bb1, const RichBasicBlock& bb2)
 	return bb1._bb == bb2._bb;
 }
 
-const Constraint& RichBasicBlock::getConstraintForSucc(const RichBasicBlock& succ) const
+std::tuple<const edge,const Constraint&> RichBasicBlock::getConstraintForSucc(const RichBasicBlock& succ) const
 {
 	return _succs.at(succ.getRawBB()); //throws an error if bb is not found
 					   //it should NEVER be the case

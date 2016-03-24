@@ -18,6 +18,7 @@ class LoopBasicBlock;
 class Evaluator {
 	public:
 		Evaluator();
+		~Evaluator();
 		void evaluateAllPaths();
 
 	private:
