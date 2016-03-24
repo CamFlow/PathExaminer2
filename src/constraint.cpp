@@ -24,16 +24,15 @@ Constraint::Constraint(edge e)
 		assert(gimple_code(last) == GIMPLE_COND);
 		lhs = gimple_cond_lhs(last);
 		rhs = gimple_cond_rhs(last);
-		if (e->flags == EDGE_TRUE_VALUE)
+		if (e->flags & EDGE_TRUE_VALUE)
 			rel = gimple_cond_code(last);
 		else
-			rel =
-				gimple_cond_code(last) == EQ_EXPR ? NE_EXPR :
-				gimple_cond_code(last) == NE_EXPR ? EQ_EXPR :
-				gimple_cond_code(last) == LT_EXPR ? GE_EXPR :
-				gimple_cond_code(last) == LE_EXPR ? GT_EXPR :
-				gimple_cond_code(last) == GT_EXPR ? LE_EXPR :
-				                                    LT_EXPR;
+			rel = gimple_cond_code(last) == EQ_EXPR ? NE_EXPR :
+			      gimple_cond_code(last) == NE_EXPR ? EQ_EXPR :
+			      gimple_cond_code(last) == LT_EXPR ? GE_EXPR :
+			      gimple_cond_code(last) == LE_EXPR ? GT_EXPR :
+			      gimple_cond_code(last) == GT_EXPR ? LE_EXPR :
+			   /* gimple_cond_code(last) == GE_EXPR ?*/ LT_EXPR;
 	}
 }
 

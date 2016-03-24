@@ -81,7 +81,7 @@ void Configuration::doGimpleCall(gimple stmt)
 
 void Configuration::doGimpleAssign(gimple stmt)
 {
-	if (gimple_assign_single_p(stmt)) {
+	if (!gimple_assign_single_p(stmt)) {
 		std::cerr << "the statement has several rhs args" << std::endl;
 		return; //we can do nothing if stmt is
 			//more than a simple copy (e.g. if it's an operation)
@@ -253,9 +253,8 @@ bool Configuration::tryAddConstraint(Constraint c)
 		return true;
 	}
 
-	if (!is_gimple_variable(c.lhs) &&
-	    !is_gimple_variable(c.rhs) &&
-	    (TREE_CODE(c.rhs) != INTEGER_CST)) {
+	if (!is_gimple_variable(c.lhs) ||
+	    !(is_gimple_variable(c.rhs) || TREE_CODE(c.rhs) == INTEGER_CST)) {
 		std::cerr << "Bad nodes" << std::endl;
 		return false;
 	}
