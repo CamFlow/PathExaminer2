@@ -32,8 +32,8 @@ Constraint::Constraint(edge e)
 				gimple_cond_code(last) == NE_EXPR ? EQ_EXPR :
 				gimple_cond_code(last) == LT_EXPR ? GE_EXPR :
 				gimple_cond_code(last) == LE_EXPR ? GT_EXPR :
-				gimple_cond_code(last) == GT_EXPR ? GE_EXPR :
-				                                    GT_EXPR;
+				gimple_cond_code(last) == GT_EXPR ? LE_EXPR :
+				                                    LT_EXPR;
 	}
 }
 

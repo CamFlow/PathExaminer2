@@ -12,7 +12,7 @@ struct Constraint {
 	tree rhs;
 
 	Constraint() = default;
-	Constraint(edge e);
+	explicit Constraint(edge e);
 	Constraint(tree lhs, tree_code rel, tree rhs);
 	friend bool operator<(const Constraint& c1, const Constraint& c2);
 };
