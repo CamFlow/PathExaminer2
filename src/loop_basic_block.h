@@ -28,6 +28,7 @@ public:
 	virtual void print(std::ostream& o) const override;
 	void setClobbersAllMemVars() { _clobbersMemVars = true; }
 	bool getClobbersAllMemVars() { return _clobbersMemVars; }
+	virtual void applyAllConstraints(Configuration& k) override;
 };
 
 #endif /* ifndef LOOP_BASIC_BLOCK_H */

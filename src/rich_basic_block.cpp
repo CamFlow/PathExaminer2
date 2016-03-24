@@ -3,10 +3,12 @@
 #include <gcc-plugin.h>
 #include <gimple.h>
 #include <basic-block.h>
+#include <tree-flow.h>
 
 #include <tuple>
 
 #include "rich_basic_block.h"
+#include "configuration.h"
 
 RichBasicBlock::RichBasicBlock(basic_block bb) :
 	_bb(bb),
@@ -91,3 +93,19 @@ void RichBasicBlock::print(std::ostream& o) const
 	o << ")";
 }
 
+void RichBasicBlock::applyAllConstraints(Configuration& k)
+{
+	for (gimple_stmt_iterator it = gsi_start_phis(_bb) ;
+			!gsi_end_p(it);
+			gsi_next(&it)) {
+		gimple stmt = gsi_stmt(it);
+		k << stmt;
+	}
+	for (gimple_stmt_iterator it = gsi_start_bb(_bb) ;
+			!gsi_end_p(it);
+			gsi_next(&it)) {
+		gimple stmt = gsi_stmt(it);
+		std::cerr << "Next statement : " << gimple_code_name[gimple_code(stmt)] << std::endl;
+		k << stmt;
+	}
+}

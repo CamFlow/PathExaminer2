@@ -12,6 +12,8 @@
 
 #include "constraint.h"
 
+class Configuration;
+
 class RichBasicBlock {
 protected:
 	basic_block _bb;
@@ -29,6 +31,8 @@ public:
 	bool hasFlowNode() const { return _hasFlow; }
 	bool hasLSMNode() const { return _hasLSM; }
 	const basic_block& getRawBB() const { return _bb; }
+	virtual void applyAllConstraints(Configuration& k);
+
 	std::tuple<const edge,const Constraint&> getConstraintForSucc(const RichBasicBlock& succ) const;
 
 friend bool operator==(const RichBasicBlock&, const RichBasicBlock&);

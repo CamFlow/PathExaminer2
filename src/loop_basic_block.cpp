@@ -7,6 +7,7 @@
 #include <set>
 
 #include "loop_basic_block.h"
+#include "configuration.h"
 
 LoopBasicBlock::LoopBasicBlock(struct loop* l) :
 	RichBasicBlock()
@@ -86,4 +87,12 @@ void LoopBasicBlock::print(std::ostream& o) const
 {
 	o << "(LoopBasicBlock)";
 	this->RichBasicBlock::print(o);
+}
+
+void LoopBasicBlock::applyAllConstraints(Configuration& k)
+{
+	for (tree t : _clobbered)
+		k.resetVar(t);
+	if (_clobbersMemVars)
+		k.resetAllVarMem();
 }

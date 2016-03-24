@@ -204,19 +204,7 @@ void Evaluator::walkGraph(RichBasicBlock* dest)
 			//TODO do something because we have found a possible path
 		}
 
-		for (gimple_stmt_iterator it = gsi_start_phis(rbb->getRawBB()) ;
-			!gsi_end_p(it);
-			gsi_next(&it)) {
-			gimple stmt = gsi_stmt(it);
-			k << stmt;
-		}
-		for (gimple_stmt_iterator it = gsi_start_bb(rbb->getRawBB()) ;
-			!gsi_end_p(it);
-			gsi_next(&it)) {
-			gimple stmt = gsi_stmt(it);
-			std::cerr << "Next statement : " << gimple_code_name[gimple_code(stmt)] << std::endl;
-			k << stmt;
-		}
+		rbb->applyAllConstraints(k);
 		std::cerr << "Handled all statements" << std::endl;
 
 		for (const auto& succ : _graph[rbb]) { //for all successors of current bb
