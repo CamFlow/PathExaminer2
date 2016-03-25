@@ -12,7 +12,8 @@ libkayrebt_pathexaminer2_la_SOURCES=\
 	configuration.cpp    \
 	configuration.h      \
 	loop_basic_block.cpp \
-	loop_basic_block.h
+	loop_basic_block.h   \
+	debug.h
 
 libkayrebt_pathexaminer2_la_CXXFLAGS = -std=c++11 -I @gcc_includes@
 libkayrebt_pathexaminer2_la_LDFLAGS  = -version-info 1:0:0

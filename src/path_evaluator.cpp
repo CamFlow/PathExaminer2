@@ -26,12 +26,15 @@
 #include <dumpfile.h>
 
 #include "evaluator.h"
-/**
- * \brief Must-be-defined value for license compatibility
- */
-int plugin_is_GPL_compatible;
+#include "debug.h"
+
+DebugMe DebugMe::INSTANCE;
 
 extern "C" {
+	/**
+	 * \brief Must-be-defined value for license compatibility
+	 */
+	int plugin_is_GPL_compatible;
 	static bool evaluate_paths_gate();
 	static unsigned int evaluate_paths();
 

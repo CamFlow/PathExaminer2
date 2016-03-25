@@ -9,6 +9,7 @@
 
 #include "rich_basic_block.h"
 #include "configuration.h"
+#include "debug.h"
 
 RichBasicBlock::RichBasicBlock(basic_block bb) :
 	_bb(bb),
@@ -18,11 +19,11 @@ RichBasicBlock::RichBasicBlock(basic_block bb) :
 	if (bb == EXIT_BLOCK_PTR)
 		return;
 
-	std::cerr << "+ Building RichBasicBlock " << bb->index << std::endl;
+	debug() << "Building a regular RichBasicBlock " << bb->index << std::endl;
 
 	if (bb != ENTRY_BLOCK_PTR) {
 		std::tie(_hasLSM,_hasFlow) = isLSMorFlowBB(_bb);
-		std::cerr << std::boolalpha
+		debug() << std::boolalpha
 			<< "    has flow: " << _hasFlow
 			<< "    has LSM: "  << _hasLSM
 			<< std::endl;
@@ -44,20 +45,20 @@ std::tuple<bool,bool> RichBasicBlock::isLSMorFlowBB(basic_block bb)
 		gimple stmt = gsi_stmt(it);
 		if (gimple_code(stmt) != GIMPLE_CALL)
 			continue;
-		std::cerr << "GIMPLE CALL" << std::endl;
+		debug() << "GIMPLE CALL" << std::endl;
 		tree fndecl = gimple_call_fndecl(stmt);
 		if (!fndecl || fndecl == NULL_TREE)
 			continue;
-		std::cerr << "GIMPLE CALL with a decl" << std::endl;
+		debug() << "GIMPLE CALL with a decl" << std::endl;
 
 		tree fn = DECL_NAME(fndecl);
 		if (fn && fn != NULL_TREE) {
 			std::string name(IDENTIFIER_POINTER(fn));
 			isLSM = isLSM || (name.find("security_") != name.npos);
 			isFlow = isFlow || (name == "kayrebt_FlowNodeMarker");
-			std::cerr << "name: " << name;
-			std::cerr << "\tisLSM: " << isLSM;
-			std::cerr << "\tisFlow: " << isFlow << std::endl;
+			debug() << "name: " << name;
+			debug() << "\tisLSM: " << isLSM;
+			debug() << "\tisFlow: " << isFlow << std::endl;
 		}
 	}
 
@@ -105,7 +106,7 @@ void RichBasicBlock::applyAllConstraints(Configuration& k)
 			!gsi_end_p(it);
 			gsi_next(&it)) {
 		gimple stmt = gsi_stmt(it);
-		std::cerr << "Next statement : " << gimple_code_name[gimple_code(stmt)] << std::endl;
+		debug() << "Next statement : " << gimple_code_name[gimple_code(stmt)] << std::endl;
 		k << stmt;
 	}
 }

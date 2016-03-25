@@ -18,6 +18,7 @@
 
 #include "configuration.h"
 #include "constraint.h"
+#include "debug.h"
 
 const type_t Configuration::YICES_INT{yices_int_type()};
 
@@ -27,7 +28,7 @@ Configuration::Configuration() :
 	_indexLastEdgeTaken{0},
 	_lastBB{ENTRY_BLOCK_PTR}
 {
-	std::cerr << "Configuration created, _constraints size: " << _constraints.size() << std::endl;
+	debug() << "Configuration created, _constraints size: " << _constraints.size() << std::endl;
 }
 
 Configuration& Configuration::operator<<(gimple stmt)
@@ -82,7 +83,7 @@ void Configuration::doGimpleCall(gimple stmt)
 void Configuration::doGimpleAssign(gimple stmt)
 {
 	if (!gimple_assign_single_p(stmt)) {
-		std::cerr << "the statement has several rhs args" << std::endl;
+		debug() << "the statement has several rhs args" << std::endl;
 		return; //we can do nothing if stmt is
 			//more than a simple copy (e.g. if it's an operation)
 	}
@@ -115,7 +116,7 @@ void Configuration::doGimpleAssign(gimple stmt)
 			}
 		}
 	} else if (is_gimple_variable(lhs)) {
-		std::cerr << strForTree(lhs) << " is a variable" << std::endl;
+		debug() << strForTree(lhs) << " is a variable" << std::endl;
 		resetVar(lhs);
 		if (!gimple_clobber_p(stmt))
 			tryAddConstraint(Constraint(lhs,EQ_EXPR,rhs));
@@ -149,29 +150,29 @@ void Configuration::doAddConstraint(Constraint c)
 		Configuration::getNormalizedTerm(c.lhs),
 		Configuration::getNormalizedTerm(c.rhs)
 	);
-	std::cerr << "After normalization, new constraint: " << std::endl;
+	debug() << "After normalization, new constraint: " << std::endl;
 	yices_pp_term(stderr, t, 40, 1, 0);
 
-	std::cerr << "Constraint about to be inserted, size: " << _constraints.size() << std::endl;
+	debug() << "Constraint about to be inserted, size: " << _constraints.size() << std::endl;
 	for (const auto& p : _constraints) {
-		std::cerr << "\t";
+		debug() << "\t";
 		yices_pp_term(stderr, p.second, 40, 1, 0);
 	}
 	_constraints.emplace_back(std::move(c),t);
-	std::cerr << "Constraint inserted, size: " << _constraints.size() << std::endl;
+	debug() << "Constraint inserted, size: " << _constraints.size() << std::endl;
 }
 
 Configuration::operator bool()
 {
 	std::vector<term_t> terms;
-	std::cerr << "Building the set of constraints" << std::endl;
+	debug() << "Building the set of constraints" << std::endl;
 	std::transform(_constraints.cbegin(), _constraints.cend(),
 			std::back_inserter(terms),
 			[](const std::pair<Constraint,term_t>& p) {
 				return p.second;
 			}
 	);
-	std::cerr << "Set of constraints built" << std::endl;
+	debug() << "Set of constraints built" << std::endl;
 	return checkVectorOfConstraints(terms);
 }
 
@@ -189,9 +190,9 @@ bool Configuration::checkVectorOfConstraints(std::vector<term_t>& terms)
 	bool res = yices_check_context(ctx.get(), nullptr) & (STATUS_SAT | STATUS_UNKNOWN);
 
 	if (res)
-		std::cerr << "Yices says satisfiable" << std::endl;
+		debug() << "Yices says satisfiable" << std::endl;
 	else
-		std::cerr << "Yices says unsatisfiable" << std::endl;
+		debug() << "Yices says unsatisfiable" << std::endl;
 	return res;
 }
 
@@ -236,7 +237,7 @@ void Configuration::resetAllVarMem()
 
 bool Configuration::tryAddConstraint(Constraint c)
 {
-	std::cerr << "Trying to add a constraint about " << strForTree(c.lhs)
+	debug() << "Trying to add a constraint about " << strForTree(c.lhs)
 		  << "\n\tlhs tree code: " << tree_code_name[TREE_CODE(c.lhs)]
 		  << "\n\trhs tree code: " << tree_code_name[TREE_CODE(c.rhs)]
 		  << std::endl;
@@ -255,23 +256,23 @@ bool Configuration::tryAddConstraint(Constraint c)
 
 	if (!is_gimple_variable(c.lhs) ||
 	    !(is_gimple_variable(c.rhs) || TREE_CODE(c.rhs) == INTEGER_CST)) {
-		std::cerr << "Bad nodes" << std::endl;
+		debug() << "Bad nodes" << std::endl;
 		return false;
 	}
 
 	if ((DECL_P(c.lhs) && is_global_var(c.lhs)) ||
             (DECL_P(c.rhs) && is_gimple_variable(c.rhs) && is_global_var(c.rhs))) {
-		std::cerr << "Cannot handle global vars" << std::endl;
+		debug() << "Cannot handle global vars" << std::endl;
 		return false;
 	}
 
 	if ((DECL_P(c.lhs) && TREE_THIS_VOLATILE(c.lhs)) ||
 	    (DECL_P(c.rhs) && TREE_THIS_VOLATILE(c.rhs))) {
-		std::cerr << "Cannot handle volatile" << std::endl;
+		debug() << "Cannot handle volatile" << std::endl;
 		return false;
 	}
 
-	std::cerr << "Constraint accepted" << std::endl;
+	debug() << "Constraint accepted" << std::endl;
 
 	doAddConstraint(c);
 
@@ -302,7 +303,7 @@ const std::string& Configuration::strForTree(tree t)
 		else
 			res = IDENTIFIER_POINTER(name);
 	} else {
-		std::cerr << "Warning: trying to get a name for " << tree_code_name[TREE_CODE(t)] << std::endl;
+		debug() << "Warning: trying to get a name for " << tree_code_name[TREE_CODE(t)] << std::endl;
 	}
 
 	return _strings.insert(std::make_pair(t,res)).first->second;
@@ -322,7 +323,7 @@ term_t Configuration::getNormalizedTerm(tree t)
 	} else if (TREE_CODE(t) == INTEGER_CST) {
 		res = yices_int64(TREE_INT_CST(t).to_shwi());
 	}
-	std::cerr << "Normalized term " << strForTree(t) << std::endl;
+	debug() << "Normalized term " << strForTree(t) << std::endl;
 	yices_pp_term(stderr, res, 120, 50, 0);
 
 	return res;
