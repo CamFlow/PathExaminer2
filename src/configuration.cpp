@@ -18,6 +18,7 @@
 
 #include "configuration.h"
 #include "constraint.h"
+#include "rich_basic_block.h"
 #include "debug.h"
 
 const type_t Configuration::YICES_INT{yices_int_type()};
@@ -25,8 +26,7 @@ const type_t Configuration::YICES_INT{yices_int_type()};
 std::map<tree,std::string> Configuration::_strings;
 
 Configuration::Configuration() :
-	_indexLastEdgeTaken{0},
-	_lastBB{ENTRY_BLOCK_PTR}
+	_indexLastEdgeTaken{0}
 {
 	debug() << "Configuration created, _constraints size: " << _constraints.size() << std::endl;
 }
@@ -327,4 +327,21 @@ term_t Configuration::getNormalizedTerm(tree t)
 	yices_pp_term(stderr, res, 120, 50, 0);
 
 	return res;
+}
+
+void Configuration::setPredecessorInfo(RichBasicBlock* rbb, unsigned int edgeTaken)
+{
+	_preds.push_back(rbb);
+	_indexLastEdgeTaken = edgeTaken;
+}
+
+void Configuration::printPath(std::ostream& out)
+{
+	out << "[";
+	auto it = _preds.begin();
+	if (it != _preds.end())
+		out << **it;
+	for (++it; it != _preds.end() ; ++it)
+		out << ", " << **it;
+	out << "]";
 }

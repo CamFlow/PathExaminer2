@@ -13,6 +13,7 @@
 #include <yices.h>
 
 struct Constraint;
+class RichBasicBlock;
 
 class Configuration
 {
@@ -21,7 +22,7 @@ class Configuration
 		static std::map<tree,std::string> _strings;
 		std::map<tree,tree> _ptrDestination;
 		unsigned int _indexLastEdgeTaken;
-		basic_block _lastBB;
+		std::vector<RichBasicBlock*> _preds;
 
 		const static type_t YICES_INT;
 
@@ -38,11 +39,8 @@ class Configuration
 		void resetVar(tree var);
 		void resetAllVarMem();
 		bool tryAddConstraint(Constraint c);
-		void setPredecessorInfo(basic_block bb, unsigned int edgeTaken)
-		{
-			_lastBB = bb;
-			_indexLastEdgeTaken = edgeTaken;
-		}
+		void setPredecessorInfo(RichBasicBlock* rbb, unsigned int edgeTaken);
+		void printPath(std::ostream& out = std::cout);
 		static bool checkVectorOfConstraints(std::vector<term_t>& terms);
 		Configuration& operator<<(gimple stmt);
 		Configuration& operator<<(const Constraint& c);

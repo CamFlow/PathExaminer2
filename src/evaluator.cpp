@@ -203,8 +203,11 @@ void Evaluator::walkGraph(RichBasicBlock* dest)
 		walk.pop();
 
 		if (rbb == dest) {
-			debug() << "Found a path\n" << std::endl;
-			//TODO do something because we have found a possible path
+			k.setPredecessorInfo(rbb, 0);
+			std::cerr << "Found a path\n\t";
+			k.printPath(std::cerr);
+			std::cerr << "\n";
+			continue; //we can explore other branches
 		}
 
 		rbb->applyAllConstraints(k);
@@ -219,7 +222,7 @@ void Evaluator::walkGraph(RichBasicBlock* dest)
 			Configuration newk{k};
 			debug() << "Configuration copied" << std::endl;
 
-			newk.setPredecessorInfo(rbb->getRawBB(),e->dest_idx);
+			newk.setPredecessorInfo(rbb,e->dest_idx);
 			debug() << "Copy of configuration initialized" << std::endl;
 			newk << c;
 			debug() << "Constraint added to configuration" << std::endl;
