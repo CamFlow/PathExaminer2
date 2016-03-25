@@ -7,6 +7,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <cstring>
 
 #include <gcc-plugin.h>
 
@@ -85,6 +86,7 @@ extern "C" {
 }
 
 static struct plugin_name_args* functions;
+const char* functionToAnalyze = nullptr;
 
 /**
  * \brief Plugin entry point
@@ -134,7 +136,17 @@ extern "C" int plugin_init (struct plugin_name_args *plugin_info,
 //			else
 //				check_operator_eq = false;
 //		}
-//		else
+		if (!strcmp (argv[i].key, "function"))
+		{
+			if (argv[i].value) {
+				functionToAnalyze = argv[i].value;
+			} else {
+				warning (0, G_("option '-fplugin-arg-%s-check-operator-eq'"
+							" ignored (missing arguments)"),
+						plugin_name, argv[i].value);
+			}
+		}
+		else
 			warning (0, G_("plugin %qs: unrecognized argument %qs ignored"),
 					plugin_name, argv[i].key);
 	}
@@ -150,7 +162,9 @@ extern "C" int plugin_init (struct plugin_name_args *plugin_info,
 
 extern "C" bool evaluate_paths_gate()
 {
-	return true;//dump_file;
+	return functionToAnalyze ?
+		strcmp(functionToAnalyze,current_function_name()) == 0 :
+		true;
 }
 
 /**
