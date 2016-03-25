@@ -193,6 +193,8 @@ void Evaluator::dfs_visit(RichBasicBlock* bb, std::map<RichBasicBlock*,Color>& c
 
 void Evaluator::walkGraph(RichBasicBlock* dest)
 {
+	unsigned int pathsFound = 0;
+	unsigned int pathsRejected = 0;
 	debug() << "\nStarting the walk until " << *dest << std::endl;
 	std::stack<std::pair<RichBasicBlock*,Configuration>> walk;
 	walk.emplace(_allbbs.at(ENTRY_BLOCK_PTR).get(),Configuration());
@@ -205,6 +207,7 @@ void Evaluator::walkGraph(RichBasicBlock* dest)
 		if (rbb == dest) {
 			k.setPredecessorInfo(rbb, 0);
 			std::cerr << "Found a path\n\t";
+			pathsFound++;
 			k.printPath(std::cerr);
 			std::cerr << "\n";
 			continue; //we can explore other branches
@@ -228,7 +231,15 @@ void Evaluator::walkGraph(RichBasicBlock* dest)
 			debug() << "Constraint added to configuration" << std::endl;
 			if (newk)
 				walk.emplace(succ, newk);
-			// else : abandon the path, the resulting configuration is invalid
+			 else //abandon the path, the resulting configuration is invalid
+				pathsRejected++;
+
 		}
 	}
+	std::cerr << "----------------------\n"
+		  << "Result of the analysis\n"
+		  << "paths found: " << pathsFound << "\n"
+		  << "paths rejected: " << pathsRejected << "\n"
+		  << "----------------------\n"
+		  << std::endl;
 }
