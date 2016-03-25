@@ -82,7 +82,8 @@ void Configuration::doGimpleCall(gimple stmt)
 
 void Configuration::doGimpleAssign(gimple stmt)
 {
-	if (!gimple_assign_single_p(stmt)) {
+	//TODO possibly unsafe
+	if (!gimple_assign_single_p(stmt) && !gimple_assign_cast_p(stmt)) {
 		debug() << "the statement has several rhs args" << std::endl;
 		return; //we can do nothing if stmt is
 			//more than a simple copy (e.g. if it's an operation)
