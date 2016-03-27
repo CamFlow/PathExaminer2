@@ -1,3 +1,10 @@
+/**
+ * @file configuration.cpp
+ * @brief Implementation of the Configuration class
+ * @author Laurent Georget
+ * @version 0.1
+ * @date 2016-03-27
+ */
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -275,7 +282,7 @@ bool Configuration::tryAddConstraint(Constraint c)
 
 	debug() << "Constraint accepted" << std::endl;
 
-	doAddConstraint(c);
+	doAddConstraint(std::move(c));
 
 	return true;
 }

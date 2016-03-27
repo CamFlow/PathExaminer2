@@ -1,3 +1,10 @@
+/**
+ * @file constraint.cpp
+ * @brief Implementation of the Constraint class
+ * @author Laurent Georget
+ * @version 0.1
+ * @date 2016-03-27
+ */
 #include <cstdlib>
 #include <gcc-plugin.h>
 #include <basic-block.h>

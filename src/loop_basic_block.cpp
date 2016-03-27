@@ -1,3 +1,10 @@
+/**
+ * @file loop_basic_block.cpp
+ * @brief Implementation of the LoopBasicBlock class
+ * @author Laurent Georget
+ * @version 0.1
+ * @date 2016-03-27
+ */
 #include <cstdlib>
 #include <gcc-plugin.h>
 #include <tree-flow.h>
@@ -64,23 +71,17 @@ LoopBasicBlock::LoopBasicBlock(struct loop* l) :
 		if (e->dest != l->header)
 			_succs.emplace(e->dest, std::forward_as_tuple(e,Constraint(e)));
 
-	_loopBody = loopBBs;
-	_size = l->num_nodes;
 	_bb = loopBBs[0];
 	_hasLSM =false;
 	_hasFlow = false;
 
-	for (unsigned int i=0 ; i<_size ; i++) {
+	for (unsigned int i=0 ; i<l->num_nodes ; i++) {
 		bool lsm, flow;
-		std::tie(lsm,flow) = isLSMorFlowBB(_loopBody[i]);
+		std::tie(lsm,flow) = isLSMorFlowBB(loopBBs[i]);
 		_hasLSM = _hasLSM || lsm;
 		_hasFlow = _hasFlow || flow;
 	}
-}
-
-LoopBasicBlock::~LoopBasicBlock()
-{
-	free(_loopBody);
+	free(loopBBs);
 }
 
 void LoopBasicBlock::print(std::ostream& o) const

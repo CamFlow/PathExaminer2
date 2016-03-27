@@ -4,8 +4,6 @@ libkayrebt_pathexaminer2_la_SOURCES=\
 	constraint.h         \
 	evaluator.cpp        \
 	evaluator.h          \
-	oracle.h             \
-	path.h               \
 	path_evaluator.cpp   \
 	rich_basic_block.cpp \
 	rich_basic_block.h   \

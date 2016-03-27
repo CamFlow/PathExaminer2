@@ -1,5 +1,5 @@
 /**
- * \file cgrapher4gcc.cpp
+ * \file path_evaluator.cpp
  * \author Laurent Georget
  * \date 2015-03-03
  * \brief Entry point of the plugin
@@ -86,11 +86,14 @@ extern "C" {
 }
 
 static struct plugin_name_args* functions;
+/**
+ * @brief The function to analyze (-fplugin-arg-kayrebt_pathexaminer2-function=...)
+ */
 const char* functionToAnalyze = nullptr;
 
 /**
  * \brief Plugin entry point
- * \param plugin_args the command line options passed to the plugin
+ * \param plugin_info the command line options passed to the plugin
  * \param version the plugin version information
  * \return 0 if everything went well, -1 if the plugin is incompatible with
  * the active version of GCC

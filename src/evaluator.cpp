@@ -1,3 +1,10 @@
+/**
+ * @file evaluator.cpp
+ * @brief Implementation of the Evaluator class
+ * @author Laurent Georget
+ * @version 0.1
+ * @date 2016-03-25
+ */
 #include <cstdlib>
 #include <cassert>
 #include <gcc-plugin.h>

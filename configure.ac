@@ -36,7 +36,7 @@ if test -z "$DOXYGEN";
    then AC_MSG_WARN([[Doxygen not found - continuing without Doxygen support]])
 fi
 AM_CONDITIONAL([HAVE_DOXYGEN],[test -n "$DOXYGEN"])
-AM_COND_IF([HAVE_DOXYGEN], [AC_CONFIG_FILES([Doxyfile])])
+AM_COND_IF([HAVE_DOXYGEN], [AC_CONFIG_FILES([Doxyfile custom.css])])
 AM_CONDITIONAL([HAVE_DOT],[test -n "$DOT"])
 AM_COND_IF([HAVE_DOT], [AC_SUBST(DOT_IS_AVAILABLE,["YES"])], [AC_SUBST(DOT_IS_AVAILABLE,["NO"])])
 LT_INIT

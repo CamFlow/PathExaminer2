@@ -1,3 +1,10 @@
+/**
+ * @file rich_basic_block.cpp
+ * @brief Implementation of the RichBasicBlock class
+ * @author Laurent Georget
+ * @version 0.1
+ * @date 2016-03-27
+ */
 #include <cstdlib>
 #include <cstring>
 #include <gcc-plugin.h>
@@ -63,11 +70,6 @@ std::tuple<bool,bool> RichBasicBlock::isLSMorFlowBB(basic_block bb)
 	}
 
 	return std::make_tuple(isLSM, isFlow);
-}
-
-bool operator==(const RichBasicBlock& bb1, const RichBasicBlock& bb2)
-{
-	return bb1._bb == bb2._bb;
 }
 
 std::tuple<const edge,const Constraint&> RichBasicBlock::getConstraintForSucc(const RichBasicBlock& succ) const
