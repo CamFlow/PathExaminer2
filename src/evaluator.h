@@ -19,7 +19,7 @@
 
 class Configuration;
 struct Constraint;
-class LoopBasicBlock;
+class LoopHeaderBasicBlock;
 
 /**
  * @brief Main class, responsible for computing all interesting execution paths
@@ -79,14 +79,14 @@ class Evaluator {
 		};
 
 		/**
-		 * @brief Builds a rich basic block representing a loop
+		 * @brief Builds a rich basic block representing a loop header
 		 *
 		 * The pointer which is returned must be freed at the
 		 * destruction of the Evaluator.
 		 * @param bb any basic block belonging to the loop
-		 * @return a pointer to a newly allocated LoopBasicBlock
+		 * @return a pointer to a newly allocated LoopBasicBlockHeader
 		 */
-		LoopBasicBlock* buildLoop(basic_block bb);
+		LoopHeaderBasicBlock* buildLoopHeader(basic_block bb);
 
 		/**
 		 * @brief Builds the minimal basic block subgraph necessary for the exploration of all paths from the root to a given basic block

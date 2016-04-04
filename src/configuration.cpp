@@ -128,6 +128,12 @@ void Configuration::doGimpleAssign(gimple stmt)
 		resetVar(lhs);
 		if (!gimple_clobber_p(stmt))
 			tryAddConstraint(Constraint(lhs,EQ_EXPR,rhs));
+	} else if (TREE_CODE(lhs) == COMPONENT_REF
+		|| TREE_CODE(lhs) == BIT_FIELD_REF
+		|| TREE_CODE(lhs) == ARRAY_REF)  { //component assignment
+		tree var = TREE_OPERAND(lhs, 0);
+		resetVar(var);
+		// useful ??
 	} else {
 		throw std::runtime_error(std::string("Unhandled assignment: ") + tree_code_name[TREE_CODE(lhs)]);
 	}

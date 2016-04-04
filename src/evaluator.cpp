@@ -25,7 +25,7 @@
 
 #include "evaluator.h"
 #include "configuration.h"
-#include "loop_basic_block.h"
+#include "loop_header_basic_block.h"
 
 #include "debug.h"
 
@@ -42,12 +42,12 @@ Evaluator::Evaluator()
 			  << bool(bb_loop_depth(bb) > 0) << std::endl;
 
 		RichBasicBlock* rbb =
-			(bb_loop_depth(bb) > 0) ?
-			buildLoop(bb) :
+			(bb_loop_depth(bb) > 0 && bb->loop_father->header == bb) ?
+			buildLoopHeader(bb) :
 			_allbbs.emplace(bb, std::unique_ptr<RichBasicBlock>(new RichBasicBlock(bb)))
 				.first->second.get();
 
-		if (rbb->hasFlowNode())
+		if (rbb->hasFlowNode() && !rbb->hasLSMNode())
 			_bbsWithFlows.insert(rbb);
 	}
 }
@@ -60,7 +60,7 @@ Evaluator::~Evaluator()
 void Evaluator::evaluateAllPaths()
 {
 	debug() << "There are " << _bbsWithFlows.size()
-		  << " bbs with flow nodes" << std::endl;
+		  << " bbs with flow nodes (excluding those having LSM nodes)" << std::endl;
 	for (RichBasicBlock* flowBB : _bbsWithFlows) {
 		debug() << "Examining " << *flowBB << std::endl;
 		_graph.clear();
@@ -85,26 +85,19 @@ void Evaluator::evaluateAllPaths()
 	}
 }
 
-LoopBasicBlock* Evaluator::buildLoop(basic_block bb)
+LoopHeaderBasicBlock* Evaluator::buildLoopHeader(basic_block bb)
 {
-	assert(bb_loop_depth(bb) > 0);
+	assert(bb_loop_depth(bb) > 0 && bb->loop_father->header == bb);
 
-	debug() << "Building a loop pseudo-basic block" << std::endl;
-	struct loop* l = loop_outermost(bb->loop_father);
-	basic_block header = l->header;
-	auto it = _allbbs.find(header);
-	if (it != _allbbs.end())
-		return static_cast<LoopBasicBlock*>(it->second.get());
-
-	LoopBasicBlock* lbb = static_cast<LoopBasicBlock*>(
+	debug() << "Building a loop header pseudo-basic block" << std::endl;
+	LoopHeaderBasicBlock* lbb = static_cast<LoopHeaderBasicBlock*>(
 		_allbbs.emplace(
-			l->header,
+			bb,
 			std::unique_ptr<RichBasicBlock>(
-				new LoopBasicBlock(l))
+				new LoopHeaderBasicBlock(bb))
 		).first->second.get());
 
-	debug() << "Loop added for basic_block " << l->header->index
-		  << " (header)" << std::endl;
+	debug() << "Loop added for basic_block " << bb->index << std::endl;
 	return lbb;
 }
 
@@ -148,11 +141,8 @@ void Evaluator::dfs_visit(RichBasicBlock* bb, std::map<RichBasicBlock*,Color>& c
 		        << " is a predecessor" << std::endl;
 		// if we are in a loop, we must jump to the header
 		// to fetch the LoopBasicBlock
-		if (bb_loop_depth(pred) > 0) {
-			debug() << "++ Visiting a loop bb" << std::endl;
-			pred = loop_outermost(pred->loop_father)->header;
-			debug() << "++ jumping to the header of the loop: " << pred->index << std::endl;
-			if (pred == bb->getRawBB()) {
+		if (bb_loop_depth(bb->getRawBB()) > 0) {
+			if (pred == bb->getRawBB()->loop_father->latch) {
 				//hmm pred is a basic block inside the loop
 				//headed by bb
 				//probably because we've just gone through the
