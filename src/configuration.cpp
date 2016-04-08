@@ -126,8 +126,16 @@ void Configuration::doGimpleAssign(gimple stmt)
 	} else if (is_gimple_variable(lhs)) {
 		debug() << strForTree(lhs) << " is a variable" << std::endl;
 		resetVar(lhs);
-		if (!gimple_clobber_p(stmt))
+
+		if (!gimple_clobber_p(stmt)) {
+			//Special case : int* p; int v; p = &v;
+			//we want to remember that *p is aliased to v
+			if (POINTER_TYPE_P(TREE_TYPE(lhs)) &&
+					TREE_CODE(rhs) == ADDR_EXPR) {
+				_ptrDestination.emplace(lhs,TREE_OPERAND(rhs,0));
+			}
 			tryAddConstraint(Constraint(lhs,EQ_EXPR,rhs));
+		}
 	} else if (TREE_CODE(lhs) == COMPONENT_REF
 		|| TREE_CODE(lhs) == BIT_FIELD_REF
 		|| TREE_CODE(lhs) == ARRAY_REF)  { //component assignment
@@ -259,17 +267,8 @@ bool Configuration::tryAddConstraint(Constraint c)
 	c.lhs = STRIP_USELESS_TYPE_CONVERSION(c.lhs);
 	c.rhs = STRIP_USELESS_TYPE_CONVERSION(c.rhs);
 
-	//Special case : int* p; int v; p = &v;
-	//we want to remember that *p is aliased to v
-	if (POINTER_TYPE_P(TREE_TYPE(c.lhs)) &&
-	    c.rel == EQ_EXPR &&
-	    TREE_CODE(c.rhs) == ADDR_EXPR) {
-		_ptrDestination.emplace(c.lhs,TREE_OPERAND(c.rhs,0));
-		return true;
-	}
-
-	if (!is_gimple_variable(c.lhs) ||
-	    !(is_gimple_variable(c.rhs) || TREE_CODE(c.rhs) == INTEGER_CST)) {
+	if (!(is_gimple_variable(c.lhs) || TREE_CODE(c.lhs) == INTEGER_CST || TREE_CODE(c.lhs) == ADDR_EXPR) ||
+	    !(is_gimple_variable(c.rhs) || TREE_CODE(c.rhs) == INTEGER_CST || TREE_CODE(c.lhs) == ADDR_EXPR)) {
 		debug() << "Bad nodes" << std::endl;
 		return false;
 	}
@@ -316,6 +315,8 @@ const std::string& Configuration::strForTree(tree t)
 			res = "<var " + std::to_string(varCounter++) + ">";
 		else
 			res = IDENTIFIER_POINTER(name);
+	} else if (TREE_CODE(t) == ADDR_EXPR) {
+		res = "&" + strForTree(TREE_OPERAND(t,0));
 	} else {
 		debug() << "Warning: trying to get a name for " << tree_code_name[TREE_CODE(t)] << std::endl;
 	}
@@ -327,7 +328,7 @@ term_t Configuration::getNormalizedTerm(tree t)
 {
 	assert (t && t != NULL_TREE);
 	term_t res = NULL_TERM;
-	if (is_gimple_variable(t)) {
+	if (is_gimple_variable(t) || TREE_CODE(t) == ADDR_EXPR) {
 		std::string s = strForTree(t);
 		res = yices_get_term_by_name(s.c_str());
 		if (res == NULL_TERM) {
