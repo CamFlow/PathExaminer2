@@ -66,6 +66,8 @@ class Evaluator {
 		 */
 		void evaluateAllPaths();
 
+		void edgeContraction();
+
 	private:
 		/**
 		 * @brief The colors the basic blocks can be assigned during
@@ -135,6 +137,14 @@ class Evaluator {
 		 * @brief The subgraph of rich basic blocks the walkGraph method visits
 		 */
 		std::map<RichBasicBlock*,std::vector<RichBasicBlock*>> _graph;
+
+		void printModel(std::map<RichBasicBlock*,Color> colors);
+
+		void printPreds(RichBasicBlock* rbb);
+	
+		void printSuccs(RichBasicBlock* rbb);
+
+		bool inPreds(RichBasicBlock* rbb, int index);
 };
 
 #endif /* ifndef EVALUATOR_H */

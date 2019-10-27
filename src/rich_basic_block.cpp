@@ -40,6 +40,11 @@ RichBasicBlock::RichBasicBlock(basic_block bb) :
 	edge_iterator succ_it;
 	FOR_EACH_EDGE(succ, succ_it, _bb->succs)
 		_succs.emplace(succ->dest, std::forward_as_tuple(succ, Constraint(succ)));
+	
+	edge pred;
+	edge_iterator pred_it;
+	FOR_EACH_EDGE(pred, pred_it, _bb->preds)
+		_preds.emplace(pred->src, std::forward_as_tuple(pred, Constraint(pred)));		
 }
 
 std::tuple<bool,bool> RichBasicBlock::isLSMorFlowBB(basic_block bb)
@@ -77,6 +82,13 @@ std::tuple<const edge,const Constraint&> RichBasicBlock::getConstraintForSucc(co
 	return _succs.at(succ.getRawBB()); //throws an error if bb is not found
 					   //it should NEVER be the case
 }
+
+std::tuple<const edge,const Constraint&> RichBasicBlock::getConstraintForPred(const RichBasicBlock& pred) const
+{
+        return _preds.at(pred.getRawBB()); //throws an error if bb is not found
+                                           //it should NEVER be the case
+}
+
 
 std::ostream& operator<<(std::ostream& o, const RichBasicBlock& rbb)
 {

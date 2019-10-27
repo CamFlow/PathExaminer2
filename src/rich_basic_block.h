@@ -35,6 +35,8 @@ protected:
 	 * @brief The successors of the basic block in the CFG
 	 */
 	std::map<basic_block,std::tuple<edge,Constraint>> _succs;
+
+	std::map<basic_block,std::tuple<edge,Constraint>> _preds;
 	/**
 	 * @brief Whether the basic block contains a flow instruction
 	 */
@@ -90,6 +92,10 @@ public:
 	 * @return the underlying GCC basic block
 	 */
 	const basic_block& getRawBB() const { return _bb; }
+
+	std::map<basic_block,std::tuple<edge,Constraint>>& getSuccs() { return _succs; } 
+	
+	std::map<basic_block,std::tuple<edge,Constraint>>& getPreds() { return _preds; } 
 	/**
 	 * @brief Update the configuration passed as a parameter with all the
 	 * constraints bringed along by this basic block
@@ -107,6 +113,8 @@ public:
 	 * constraint born by this edge
 	 */
 	std::tuple<const edge,const Constraint&> getConstraintForSucc(const RichBasicBlock& succ) const;
+
+	std::tuple<const edge,const Constraint&> getConstraintForPred(const RichBasicBlock& pred) const;
 
 /**
  * @brief Outputs a rich basic block to an output stream

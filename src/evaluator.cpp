@@ -61,6 +61,7 @@ void Evaluator::evaluateAllPaths()
 {
 	debug() << "There are " << _bbsWithFlows.size()
 		  << " bbs with flow nodes (excluding those having LSM nodes)" << std::endl;
+	/*
 	for (RichBasicBlock* flowBB : _bbsWithFlows) {
 		debug() << "Examining " << *flowBB << std::endl;
 		_graph.clear();
@@ -83,6 +84,13 @@ void Evaluator::evaluateAllPaths()
 		}
 		walkGraph(flowBB);
 	}
+	*/
+	debug() << "These are all the basic blocks:" << std::endl;
+	for (const auto& p : _allbbs) {
+		debug() << *(p.second) << std::endl;
+	}
+	edgeContraction();
+	
 }
 
 LoopHeaderBasicBlock* Evaluator::buildLoopHeader(basic_block bb)
@@ -239,4 +247,177 @@ void Evaluator::walkGraph(RichBasicBlock* dest)
 		  << "paths rejected: " << pathsRejected << "\n"
 		  << "----------------------\n"
 		  << std::endl;
+}
+
+void Evaluator::edgeContraction()
+{
+	/* Color all the RichBasicBlocks:
+	 * GREEN: entry and exit block
+	 * RED: LSM blocks
+	 * WHITE: Others */
+	std::map<RichBasicBlock*,Color> colors;
+
+        for (const auto& rbb : _allbbs)
+                if (rbb.first == ENTRY_BLOCK_PTR ||
+		    rbb.first == EXIT_BLOCK_PTR)
+                        colors[rbb.second.get()] = Color::GREEN;
+                else if (rbb.second->hasLSMNode())
+                        colors[rbb.second.get()] = Color::RED;
+                else
+                        colors[rbb.second.get()] = Color::WHITE;
+
+	/* If at least one edge is contracted in the for loop. 
+	 * If so, we will go through the graph again looking
+	 * for more possible edge contractions. Otherwise, we
+	 * will stop because there is nothing more we can do. */
+	bool edge_contracted = false;
+	do {
+		edge_contracted = false;
+		for (auto rbb = _allbbs.cbegin(); rbb != _allbbs.cend(); rbb++) {
+			debug() << "Checking color for block: " << rbb->second.get()->getRawBB()->index << std::endl;
+			/* The contracted model maintains entry and exit nodes. */
+			if (rbb->first == ENTRY_BLOCK_PTR ||
+                    	    rbb->first == EXIT_BLOCK_PTR)
+				continue;
+			/* The contracted model maintains LSM blocks. */
+			else if (colors[rbb->second.get()] == Color::RED)
+				continue;
+			/* GREY blocks have already been merged away. */
+			else if (colors[rbb->second.get()] == Color::GRAY)
+				continue;
+			else {
+				debug() << "Current white block: " << rbb->second.get()->getRawBB()->index << std::endl;
+				printPreds(rbb->second.get());
+				printSuccs(rbb->second.get());
+				for (auto sbb = rbb->second.get()->getSuccs().cbegin(); 
+					  sbb != rbb->second.get()->getSuccs().cend(); sbb++) {
+					/* succ is current block's succ. */
+					RichBasicBlock* succ = _allbbs.at(sbb->first).get();
+					/* Only edges between WHITE blocks can be contracted. */
+					if (colors[succ] != Color::WHITE)
+						continue;
+					/* Our algorithm will create self loop. Do not merge with self. */
+					if (rbb->first->index == succ->getRawBB()->index)
+						continue;
+					else {
+						debug() << "Merging current block with: " << succ->getRawBB()->index << std::endl;
+						printPreds(succ);
+						printSuccs(succ);
+						/* Add all current block's succ's succs to the block's succs. 
+						 * Update all current block's succ's succs's pred. */
+						for (auto ssbb = succ->getSuccs().cbegin();
+							  ssbb != succ->getSuccs().cend(); ssbb++) {
+							/* ssucc is current block's succ's succ. */
+							RichBasicBlock* ssucc = _allbbs.at(ssbb->first).get();
+							rbb->second.get()->getSuccs().emplace(ssucc->getRawBB(), 
+											      succ->getConstraintForSucc(*ssucc));
+
+							ssucc->getPreds().emplace(rbb->second.get()->getRawBB(),
+										  succ->getConstraintForPred(*rbb->second.get()));
+							ssucc->getPreds().erase(succ->getRawBB());
+						}
+						/* Add all current block's succ's preds (except the current block) to the block's preds. 
+						 * Update current block's succ's pred's succ. */
+						for (auto spbb = succ->getPreds().cbegin();
+							  spbb != succ->getPreds().cend(); spbb++) {
+							/* Make sure we are not adding the current block to its own preds
+							 * if current block's succ's original preds include current block. */
+							if (spbb->first->index == rbb->first->index)
+								continue; 
+							else {
+								/* spred is current block's succ's pred. */
+								RichBasicBlock* spred = _allbbs.at(spbb->first).get();
+								rbb->second.get()->getPreds().emplace(spred->getRawBB(),
+												      succ->getConstraintForPred(*spred));
+								spred->getSuccs().emplace(rbb->second.get()->getRawBB(),
+											  succ->getConstraintForPred(*rbb->second.get()));
+								spred->getSuccs().erase(succ->getRawBB());	  
+							}
+						}
+						/* Remove current block's succ from current block. */
+                                                rbb->second.get()->getSuccs().erase(succ->getRawBB());
+
+						debug() << "After merge, current block has: " << std::endl;
+						printPreds(rbb->second.get());
+                                		printSuccs(rbb->second.get());
+						/* The block's succ block is now merged away logically. */
+						colors[succ] = Color::GRAY;
+						/* To avoid map iterator issues, let's get out of the loop and rerun. 
+						 * We work on one block's succ at a time. */
+						edge_contracted = true;
+						break;
+
+					}
+				}
+				if (edge_contracted)
+					break;
+                        }
+                }
+
+	} while(edge_contracted);
+
+	printModel(colors);
+
+}
+
+void Evaluator::printModel(std::map<RichBasicBlock*,Color> colors)
+{
+	for (const auto& rbb : _allbbs) {
+		RichBasicBlock* bb = rbb.second.get();
+		debug() << "[ "
+			<< rbb.first->index;
+		if (colors[bb] == Color::WHITE) {
+			debug() << " (WHITE) ";
+		} else if (colors[bb] == Color::RED) {
+			debug() << " (RED) ";
+		} else if (colors[bb] == Color::GRAY) {
+			debug() << " (GRAY) ";
+		} else if (colors[bb] == Color::GREEN) {
+			debug() << " (GREEN) ";
+		}
+		debug() << "] -> [ ";
+		for (const auto& sbb : bb->getSuccs()) {
+			basic_block succbb = sbb.first;
+			RichBasicBlock* succrbb = _allbbs.at(succbb).get();
+			if (colors[succrbb] != Color::GRAY) {
+				debug() << succbb->index << " ";
+			}
+		}
+		debug() << "]" << std::endl;
+	}
+}
+
+void Evaluator::printSuccs(RichBasicBlock* rbb)
+{
+	debug() << "( succs: ";
+	for (const auto& succ : rbb->getSuccs()) {
+		debug() << succ.first->index << " ";
+	}
+	debug() << ")" << std::endl;
+}
+
+void Evaluator::printPreds(RichBasicBlock* rbb)
+{
+        debug() << "( preds: ";
+        for (const auto& pred : rbb->getPreds()) {
+                debug() << pred.first->index << " ";
+        }
+        debug() << ")" << std::endl;
+}
+
+bool Evaluator::inPreds(RichBasicBlock* rbb, int index)
+{
+	bool inPreds = false;
+	edge e;
+        edge_iterator it;
+
+        FOR_EACH_EDGE(e,it,rbb->getRawBB()->preds) {
+                basic_block pred = e->src;
+		if (pred->index == index) {
+			inPreds = true;
+			break;
+		}
+	}
+	return inPreds;
+
 }
