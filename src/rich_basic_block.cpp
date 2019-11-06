@@ -30,10 +30,8 @@ RichBasicBlock::RichBasicBlock(basic_block bb) :
 	debug() << "Building a regular RichBasicBlock " << bb->index << std::endl;
 
 	if (bb != ENTRY_BLOCK_PTR) {
-		std::tie(_hasLSM,_hasFlow) = isLSMorFlowBB(_bb);
-		_hasFunc = isFuncCallBB(_bb); 
+		std::tie(_hasLSM,_hasFunc) = isLSMorFuncBB(_bb);
 		debug() << std::boolalpha
-			<< "    has flow: " << _hasFlow
 			<< "    has LSM: "  << _hasLSM
 			<< "	has func call (other than LSM): " << _hasFunc
 			<< std::endl;
@@ -50,10 +48,10 @@ RichBasicBlock::RichBasicBlock(basic_block bb) :
 		_preds.emplace(pred->src, std::forward_as_tuple(pred, Constraint(pred)));		
 }
 
-std::tuple<bool,bool> RichBasicBlock::isLSMorFlowBB(basic_block bb)
+std::tuple<bool,bool> RichBasicBlock::isLSMorFuncBB(basic_block bb)
 {
 	bool isLSM = false;
-	bool isFlow = false;
+	bool isFunc = false;
 	for (gimple_stmt_iterator it = gsi_start_bb(bb) ;
 		!gsi_end_p(it) ;
 		gsi_next(&it)) {
@@ -70,43 +68,17 @@ std::tuple<bool,bool> RichBasicBlock::isLSMorFlowBB(basic_block bb)
 		if (fn && fn != NULL_TREE) {
 			std::string name(IDENTIFIER_POINTER(fn));
 			isLSM = isLSM || (name.find("security_") != name.npos);
-			isFlow = isFlow || (name == "kayrebt_FlowNodeMarker");
+			isFunc = isFunc || (name.find("security_") == name.npos);
 			debug() << "name: " << name;
-			debug() << "\tisLSM: " << isLSM;
-			debug() << "\tisFlow: " << isFlow << std::endl;
+			debug() << "\n";
+			_funcNames.push_back(name);
 		}
 	}
+	debug() << "Block has LSM: " << isLSM;
+	debug() << "\tBlock has isFunc: " << isFunc;
+	debug() << "\n";
 
-	return std::make_tuple(isLSM, isFlow);
-}
-
-bool RichBasicBlock::isFuncCallBB(basic_block bb)
-{
-	bool isFunc = false;
-
-	for (gimple_stmt_iterator it = gsi_start_bb(bb) ;
-             !gsi_end_p(it) ;
-             gsi_next(&it)) {
-                gimple stmt = gsi_stmt(it);
-                if (gimple_code(stmt) != GIMPLE_CALL)
-                        continue;
-                tree fndecl = gimple_call_fndecl(stmt);
-                if (!fndecl || fndecl == NULL_TREE)
-                        continue;
-
-                tree fn = DECL_NAME(fndecl);
-                if (fn && fn != NULL_TREE) {
-                        std::string name(IDENTIFIER_POINTER(fn));
-			if (name.find("security_") == name.npos) {
-				isFunc = true;
-				_funcNames.push_back(name);
-                        }
-                        debug() << "Func Name: " << name;
-                }
-        }
-	debug() << "\tisFunc: " << isFunc << std::endl;
-	
-	return isFunc;
+	return std::make_tuple(isLSM, isFunc);
 }
 
 std::tuple<const edge,const Constraint&> RichBasicBlock::getConstraintForSucc(const RichBasicBlock& succ) const

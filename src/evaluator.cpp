@@ -46,9 +46,10 @@ Evaluator::Evaluator()
 			buildLoopHeader(bb) :
 			_allbbs.emplace(bb, std::unique_ptr<RichBasicBlock>(new RichBasicBlock(bb)))
 				.first->second.get();
-
+		/*
 		if (rbb->hasFlowNode() && !rbb->hasLSMNode())
 			_bbsWithFlows.insert(rbb);
+		*/
 	}
 }
 
@@ -363,19 +364,46 @@ void Evaluator::edgeContraction()
 
 void Evaluator::printModel(std::map<RichBasicBlock*,Color> colors)
 {
+	debug() << "***** Model Summary *****\n";
+	debug() << "~~~~~ Node Summary ~~~~~\n";
+	/* First print out a summary of nodes and if they contain LSM and/or Func calls, print their names too. */
+	for (const auto& rbb : _allbbs) {
+                RichBasicBlock* bb = rbb.second.get();
+                debug() << "[ "
+                        << rbb.first->index;
+                if (colors[bb] == Color::WHITE) {
+                        debug() << " (WHITE) ";
+                } else if (colors[bb] == Color::RED) {
+                        debug() << " (RED) ";
+                } else if (colors[bb] == Color::GRAY) {
+                        debug() << " (GRAY) ";
+                } else if (colors[bb] == Color::GREEN) {
+                        debug() << " (GREEN) ";
+                }
+                debug() << "]: ";
+		for (const auto& fn : bb->getFuncNames()) {
+			debug() << fn << " ";
+		}
+                debug() << std::endl;
+        }
+	debug() << "\n~~~~~ Edge Summary ~~~~~\n";
+	/* We then print out only nodes valid in the model. */
 	for (const auto& rbb : _allbbs) {
 		RichBasicBlock* bb = rbb.second.get();
-		debug() << "[ "
-			<< rbb.first->index;
 		if (colors[bb] == Color::WHITE) {
+			debug() << "[ "
+				<< rbb.first->index;
 			debug() << " (WHITE) ";
 		} else if (colors[bb] == Color::RED) {
+			debug() << "[ "
+                                << rbb.first->index;
 			debug() << " (RED) ";
-		} else if (colors[bb] == Color::GRAY) {
-			debug() << " (GRAY) ";
 		} else if (colors[bb] == Color::GREEN) {
+			debug() << "[ "
+                                << rbb.first->index;
 			debug() << " (GREEN) ";
-		}
+		} else
+			continue;
 		debug() << "] -> [ ";
 		for (const auto& sbb : bb->getSuccs()) {
 			basic_block succbb = sbb.first;

@@ -53,26 +53,18 @@ protected:
 	 */
 	bool _hasFunc;
 	/**
-	 * @brief A linked list of function calls in a basic block (excluding LSM hook calls)
+	 * @brief A linked list of function calls in a basic block (including LSM hook calls)
 	 */
 	std::list<std::string> _funcNames;
 	/**
-	 * @brief Explore the basic block to see if it contains a flow
-	 * instruction or a LSM hook
+	 * @brief Explore the basic block to see if it contains a LSM hook
+	 * or a function call (other than LSM hook)
 	 * @param bb the basic block to explore
 	 * @return a pair of booleans (b1,b2), b1 is true if and only if bb
-	 * contains a LSM hook, b2 is true if and only if bb contains a flow
-	 * instruction
+	 * contains a LSM hook, b2 is true if and only if bb contains a
+	 * function call
 	 */
-	static std::tuple<bool,bool> isLSMorFlowBB(basic_block bb);
-	/**
-	 * @brief Explore the basic block to see if it contains function
-	 * calls (other than a LSM hook call)
-	 * @param bb the basic block to explore
-	 * @return true if and only if bb contains at least one
-	 * function call other than a LSM hook
-	 */
-	bool isFuncCallBB(basic_block bb);
+	std::tuple<bool,bool> isLSMorFuncBB(basic_block bb);
 	/**
 	 * @brief Prints the index of the basic block
 	 * @param o the output stream where to print the basic block
@@ -128,6 +120,11 @@ public:
 	 * @return the predecessors of the basic block in the CFG
 	 */
 	std::map<basic_block,std::tuple<edge,Constraint>>& getPreds() { return _preds; } 
+	/**
+	 * @brief Gets the list of function names in the basic block
+	 * @return the list of function names called in the basic block
+	 */
+	std::list<std::string>& getFuncNames() { return _funcNames; }
 	/**
 	 * @brief Update the configuration passed as a parameter with all the
 	 * constraints bringed along by this basic block
