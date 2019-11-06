@@ -1,9 +1,9 @@
 /**
  * @file evaluator.h
  * @brief Definition of the Evaluator class
- * @author Laurent Georget
- * @version 0.1
- * @date 2016-03-25
+ * @author Laurent Georget, Michael Han
+ * @version 0.2
+ * @date 2019-11-06
  */
 #ifndef EVALUATOR_H
 #define EVALUATOR_H
@@ -43,30 +43,16 @@ class Evaluator {
 		 */
 		~Evaluator();
 		/**
-		 * @brief Runs the evaluation on all possible paths
+		 * @brief Runs the evaluation on the function
 		 *
-		 * The algorithm runs as follows.
-		 * For each basic block with a flow node:
+		 * Construct a model for the function that contains only:
 		 * <ul>
-		 * <li>the graphs of all basic blocks from the root to the
-		 * flow basic block is built</li>
-		 * <li>the graph is walked, from the root, starting from
-		 * an empty configuration</li>
-		 * <ul>
-		 * <li>at each step, the configuration is augmented with
-		 * the constraints yielded by the current basic blocks</li>
-		 * <li>each successor of the current basic block creates a
-		 * new conitnuation for the current path prefix built
-		 * so far</li>
-		 * <li>the satisfiability of the current path prefix is
-		 * tested, if it returns falsy, the prefix is abandoned
-		 * and the walk backtracks to another possible path prefix</li>
-		 * </ul>
+		 * <li>GREEN entry and exit basic blocks</li>
+		 * <li>RED basic blocks that contain LSM nodes or function calls</li>
+		 * <li>WHITE basic blocks as connectors</li>
 		 * </ul>
 		 */
 		void evaluateAllPaths();
-
-		void edgeContraction();
 
 	private:
 		/**
@@ -74,11 +60,16 @@ class Evaluator {
 		 * the graph construction
 		 */
 		enum class Color {
-			WHITE, //! White basic blocks are basic blocks yet to be explored
-			GRAY, //! Gray basic blocks are basic blocks already seen but with some undiscovered predecessors
-			GREEN, //! Green basic blocks are basic blocks to which a path exists from the entry basic block that do not go through a basic block containing a LSM hook
-			RED //! Red basic blocks are basic blocks which contain LSM hook or which are unreachable from the entry basic block without passing through a basic block containing a LSM hook
+			WHITE, //! White basic blocks are basic blocks yet to be explored or used as connecting blocks
+			GRAY, //! Gray basic blocks are basic blocks already seen and merged
+			GREEN, //! Green basic blocks are entry and exit basic blocks
+			RED //! Red basic blocks are basic blocks which contain LSM hooks or functon calls
 		};
+		
+		/**
+		 * @brief Contract edges and merge nodes to build a LSM hook model
+		 */
+		void edgeContraction();
 
 		/**
 		 * @brief Builds a rich basic block representing a loop header
@@ -137,14 +128,18 @@ class Evaluator {
 		 * @brief The subgraph of rich basic blocks the walkGraph method visits
 		 */
 		std::map<RichBasicBlock*,std::vector<RichBasicBlock*>> _graph;
-
+		/**
+		 * @brief Print the final LSM hook model of the function.
+		 */
 		void printModel(std::map<RichBasicBlock*,Color> colors);
-
+		/**
+		 * @brief Print the predecessors of a basic block in the  CFG.
+		 */
 		void printPreds(RichBasicBlock* rbb);
-	
+		/**
+		 * @brief Print the successors of a basic block in the CFG.
+		 */
 		void printSuccs(RichBasicBlock* rbb);
-
-		bool inPreds(RichBasicBlock* rbb, int index);
 };
 
 #endif /* ifndef EVALUATOR_H */

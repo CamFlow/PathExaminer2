@@ -1,9 +1,9 @@
 /**
  * @file evaluator.cpp
  * @brief Implementation of the Evaluator class
- * @author Laurent Georget
- * @version 0.1
- * @date 2016-03-25
+ * @author Laurent Georget, Michael Han
+ * @version 0.2
+ * @date 2019-11-06
  */
 #include <cstdlib>
 #include <cassert>
@@ -59,9 +59,10 @@ Evaluator::~Evaluator()
 
 void Evaluator::evaluateAllPaths()
 {
+	/* We do not walk the graph from flow nodes. */
+	/*
 	debug() << "There are " << _bbsWithFlows.size()
 		  << " bbs with flow nodes (excluding those having LSM nodes)" << std::endl;
-	/*
 	for (RichBasicBlock* flowBB : _bbsWithFlows) {
 		debug() << "Examining " << *flowBB << std::endl;
 		_graph.clear();
@@ -253,7 +254,7 @@ void Evaluator::edgeContraction()
 {
 	/* Color all the RichBasicBlocks:
 	 * GREEN: entry and exit block
-	 * RED: LSM blocks
+	 * RED: LSM/Func blocks
 	 * WHITE: Others */
 	std::map<RichBasicBlock*,Color> colors;
 
@@ -261,7 +262,7 @@ void Evaluator::edgeContraction()
                 if (rbb.first == ENTRY_BLOCK_PTR ||
 		    rbb.first == EXIT_BLOCK_PTR)
                         colors[rbb.second.get()] = Color::GREEN;
-                else if (rbb.second->hasLSMNode())
+                else if (rbb.second->hasLSMNode() || rbb.second->hasFuncNode())
                         colors[rbb.second.get()] = Color::RED;
                 else
                         colors[rbb.second.get()] = Color::WHITE;
@@ -403,21 +404,4 @@ void Evaluator::printPreds(RichBasicBlock* rbb)
                 debug() << pred.first->index << " ";
         }
         debug() << ")" << std::endl;
-}
-
-bool Evaluator::inPreds(RichBasicBlock* rbb, int index)
-{
-	bool inPreds = false;
-	edge e;
-        edge_iterator it;
-
-        FOR_EACH_EDGE(e,it,rbb->getRawBB()->preds) {
-                basic_block pred = e->src;
-		if (pred->index == index) {
-			inPreds = true;
-			break;
-		}
-	}
-	return inPreds;
-
 }

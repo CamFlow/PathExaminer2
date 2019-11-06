@@ -1,9 +1,9 @@
 /**
  * @file rich_basic_block.h
  * @brief Definition of the RichBasicBlock class
- * @author Laurent Georget
- * @version 0.1
- * @date 2016-03-25
+ * @author Laurent Georget, Michael Han
+ * @version 0.2
+ * @date 2019-11-06
  */
 #ifndef RICH_BASIC_BLOCK_H
 #define RICH_BASIC_BLOCK_H
@@ -16,6 +16,7 @@
 #include <iostream>
 #include <tuple>
 #include <map>
+#include <list>
 
 #include "constraint.h"
 
@@ -35,7 +36,9 @@ protected:
 	 * @brief The successors of the basic block in the CFG
 	 */
 	std::map<basic_block,std::tuple<edge,Constraint>> _succs;
-
+	/**
+	 * @brief The predecessors of the basic block in the CFG
+	 */
 	std::map<basic_block,std::tuple<edge,Constraint>> _preds;
 	/**
 	 * @brief Whether the basic block contains a flow instruction
@@ -46,14 +49,30 @@ protected:
 	 */
 	bool _hasLSM;
 	/**
+	 * @brief Whether the basic block contains a function call (other than a LSM hook)
+	 */
+	bool _hasFunc;
+	/**
+	 * @brief A linked list of function calls in a basic block (excluding LSM hook calls)
+	 */
+	std::list<std::string> _funcNames;
+	/**
 	 * @brief Explore the basic block to see if it contains a flow
 	 * instruction or a LSM hook
 	 * @param bb the basic block to explore
-	 * @return a pair of booleans (b1,b2), b1 is true is and only if bb
+	 * @return a pair of booleans (b1,b2), b1 is true if and only if bb
 	 * contains a LSM hook, b2 is true if and only if bb contains a flow
 	 * instruction
 	 */
 	static std::tuple<bool,bool> isLSMorFlowBB(basic_block bb);
+	/**
+	 * @brief Explore the basic block to see if it contains function
+	 * calls (other than a LSM hook call)
+	 * @param bb the basic block to explore
+	 * @return true if and only if bb contains at least one
+	 * function call other than a LSM hook
+	 */
+	bool isFuncCallBB(basic_block bb);
 	/**
 	 * @brief Prints the index of the basic block
 	 * @param o the output stream where to print the basic block
@@ -78,23 +97,36 @@ public:
 	 */
 	virtual ~RichBasicBlock() = default;
 	/**
-	 * @brief Tells whether this rich basic blocks contains a flow node
+	 * @brief Tells whether this rich basic block contains a flow node
 	 * @return true if, and only if, the basic block contains a flow node
 	 */
 	bool hasFlowNode() const { return _hasFlow; }
 	/**
-	 * @brief Tells whether this rich basic blocks contains a LSM hook
+	 * @brief Tells whether this rich basic block contains a LSM hook
 	 * @return true if, and only if, the basic block contains a LSM hook
 	 */
 	bool hasLSMNode() const { return _hasLSM; }
+	/**
+	 * @brief Tells whether this rich basic block contains at least one
+	 * function call
+	 * @return true if, and only if, the basic block contains at least 
+	 * one function call
+	 */
+	bool hasFuncNode() const { return _hasFunc; }
 	/**
 	 * @brief Gets the underlying basic block
 	 * @return the underlying GCC basic block
 	 */
 	const basic_block& getRawBB() const { return _bb; }
-
+	/**
+	 * @brief Gets the successors of the basic block in the CFG
+	 * @return the successors of the basic block in the CFG
+	 */
 	std::map<basic_block,std::tuple<edge,Constraint>>& getSuccs() { return _succs; } 
-	
+	/**
+	 * @brief Gets the predecessors of the basic block in the CFG
+	 * @return the predecessors of the basic block in the CFG
+	 */
 	std::map<basic_block,std::tuple<edge,Constraint>>& getPreds() { return _preds; } 
 	/**
 	 * @brief Update the configuration passed as a parameter with all the
@@ -102,7 +134,6 @@ public:
 	 * @param k the configuration to update
 	 */
 	virtual void applyAllConstraints(Configuration& k);
-
 	/**
 	 * @brief Gets the edge and the constraint associated to it given a
 	 * basic block successor of the current basic block
@@ -113,7 +144,15 @@ public:
 	 * constraint born by this edge
 	 */
 	std::tuple<const edge,const Constraint&> getConstraintForSucc(const RichBasicBlock& succ) const;
-
+	/**
+	 *@brief Gets the edge and the constraint associated to it given a
+         * basic block predecessor of the current basic block
+         * @param pred another basic block. An edge must exist from this 
+	 * block to the current basic block.
+         * @return a pair (edge,constraint) where edge is the edge in the CFG
+         * connecting the GCC basic blocks and constraint represents the
+         * constraint born by this edge
+	 */
 	std::tuple<const edge,const Constraint&> getConstraintForPred(const RichBasicBlock& pred) const;
 
 /**
