@@ -364,6 +364,8 @@ void Evaluator::edgeContraction()
 
 void Evaluator::printModel(std::map<RichBasicBlock*,Color> colors)
 {
+	debug() << DECL_SOURCE_FILE(cfun->decl) << ":";
+	debug() << current_function_name() << ":\n";
 	debug() << "***** Model Summary *****\n";
 	debug() << "~~~~~ Node Summary ~~~~~\n";
 	/* First print out a summary of nodes and if they contain LSM and/or Func calls, print their names too. */
@@ -414,6 +416,7 @@ void Evaluator::printModel(std::map<RichBasicBlock*,Color> colors)
 		}
 		debug() << "]" << std::endl;
 	}
+	debug() << std::endl;
 }
 
 void Evaluator::printSuccs(RichBasicBlock* rbb)
