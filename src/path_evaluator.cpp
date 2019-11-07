@@ -28,8 +28,10 @@
 
 #include "evaluator.h"
 #include "debug.h"
+#include "json.h"
 
 DebugMe DebugMe::INSTANCE;
+JsonStream JsonStream::INSTANCE;
 
 extern "C" {
 	/**

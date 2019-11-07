@@ -129,6 +129,10 @@ class Evaluator {
 		 */
 		std::map<RichBasicBlock*,std::vector<RichBasicBlock*>> _graph;
 		/**
+		 * @brief Print the final LSM hook model in JSON format.
+		 */
+		void jsonModel(std::map<RichBasicBlock*,Color> colors);
+		/**
 		 * @brief Print the final LSM hook model of the function.
 		 */
 		void printModel(std::map<RichBasicBlock*,Color> colors);

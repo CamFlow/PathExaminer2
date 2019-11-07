@@ -28,6 +28,7 @@
 #include "loop_header_basic_block.h"
 
 #include "debug.h"
+#include "json.h"
 
 Evaluator::Evaluator()
 {
@@ -358,8 +359,64 @@ void Evaluator::edgeContraction()
 
 	} while(edge_contracted);
 
+	jsonModel(colors);
 	printModel(colors);
 
+}
+
+void Evaluator::jsonModel(std::map<RichBasicBlock*,Color> colors)
+{
+	std::map< std::string, std::map<std::string, std::vector<std::string>> > model;
+
+	std::map<std::string, std::vector<std::string>> meta;
+	std::string file_name(DECL_SOURCE_FILE(cfun->decl));
+	std::string func_name(current_function_name());
+	meta["file"] = {file_name};
+	meta["func"] = {func_name};
+	model["meta"] = meta;
+
+	std::map<std::string, std::vector<std::string>> nodes;
+	for (const auto& rbb : _allbbs) {
+                RichBasicBlock* bb = rbb.second.get();
+                int node_id = rbb.first->index;
+		std::vector<std::string> func_names = {};
+                for (const auto& fn : bb->getFuncNames()) {
+                        std::string func_name(fn);
+			func_names.push_back(func_name);
+                }
+		if (func_names.size() > 0) {
+              		nodes[std::to_string(node_id)] = func_names;
+		}
+		
+        }
+	model["nodes"] = nodes;
+
+	std::map<std::string, std::vector<std::string>> edges;
+	for (const auto& rbb : _allbbs) {
+                RichBasicBlock* bb = rbb.second.get();
+		int node_id = rbb.first->index;
+
+                if (colors[bb] != Color::WHITE &&
+		    colors[bb] != Color::RED &&
+		    colors[bb] != Color::GREEN)
+                        continue;
+		std::vector<std::string> dests = {};
+                for (const auto& sbb : bb->getSuccs()) {
+                        basic_block succbb = sbb.first;
+                        RichBasicBlock* succrbb = _allbbs.at(succbb).get();
+                        if (colors[succrbb] != Color::GRAY) {
+				std::string dest = std::to_string(succbb->index);
+                        	dests.push_back(dest);
+			}
+                }
+                if (dests.size() == 0) {
+			dests.push_back("null");
+		}
+		edges[std::to_string(node_id)] = dests;
+        }	
+	model["edge"] = edges;
+	
+	json() << model;
 }
 
 void Evaluator::printModel(std::map<RichBasicBlock*,Color> colors)
