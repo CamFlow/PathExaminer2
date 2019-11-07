@@ -389,7 +389,8 @@ void Evaluator::jsonModel(std::map<RichBasicBlock*,Color> colors)
 		}
 		
         }
-	model["nodes"] = nodes;
+	if (nodes.size() > 0)
+		model["nodes"] = nodes;
 
 	std::map<std::string, std::vector<std::string>> edges;
 	for (const auto& rbb : _allbbs) {
@@ -413,8 +414,9 @@ void Evaluator::jsonModel(std::map<RichBasicBlock*,Color> colors)
 			dests.push_back("null");
 		}
 		edges[std::to_string(node_id)] = dests;
-        }	
-	model["edge"] = edges;
+        }
+	if (edges.size() > 0)	
+		model["edge"] = edges;
 	
 	json() << model;
 }
