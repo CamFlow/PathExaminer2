@@ -391,6 +391,12 @@ void Evaluator::jsonModel(std::map<RichBasicBlock*,Color> colors)
         }
 	if (nodes.size() > 0)
 		model["nodes"] = nodes;
+	else
+		/* if the model does not contain any useful nodes,
+		 * which means that there are no external functions
+		 * or LSM hook calls within the function, we can
+		 * safely skip recording this model. */
+		return;
 
 	std::map<std::string, std::vector<std::string>> edges;
 	for (const auto& rbb : _allbbs) {
