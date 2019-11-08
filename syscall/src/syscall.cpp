@@ -5,6 +5,9 @@
 #include <sstream>
 #include <fstream>
 #include <map>
+#include <queue>
+#include <vector>
+#include <set>
 
 #include "json.hpp"
 
@@ -107,7 +110,33 @@ int main(int argc, char **argv)
 				/* We obtain the JSON object of the system call. */
 				json syscall_json_obj = inner_it->second;
 				
-				//TODO: CODE HERE TO BUILD THE FULL VERSION OF SYSCALL MODEL.
+				//TODO: CODE HERE TO BUILD THE FULL VERSION OF SYSCALL MODEL (NOT FINISHED).
+				/* Variable tracking the current largest node ID + 1. */
+				int max_id = syscall_json_obj["edge"].size();
+				/* Maintains two maps: src->dst and dst->src as we construct the model. */
+				std::map<int, std::set<int>> src2dsts;
+				std::map<int, std::set<int>> dst2srcs;
+				for (auto& el : syscall_json_obj["edge"].items()) {
+					std::string src_str = el.key();
+					std::set<std::string> dst_strs = el.value();
+
+					int src = std::stoi(src_str);
+					/* 1 is exit node, no destination nodes are connected to it. */
+					if (src == 1)
+						continue;
+					std::map<int, std::set<int>>::iterator it;
+					it = src2dsts.find(src);
+					//TODO: TO BE CONTINUED FROM HERE;
+				
+				}
+				/* Find all functions called by the syscall. */
+				
+				std::queue<json> func_queue;
+				
+				while (!func_queue.empty()) {
+					break;
+				}
+				
 			}
 		}
 	}	
