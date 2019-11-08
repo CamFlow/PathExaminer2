@@ -78,7 +78,7 @@ class JsonStream {
     		std::string dump_pair(const std::pair<const std::string, V>& pair) const {
         		std::ostringstream oss;
         		oss << dump(pair.first) << ": " << dump(pair.second);
-        		return oss.str();
+			return oss.str();
     		}
 
     		template<typename C>
@@ -91,7 +91,6 @@ class JsonStream {
             			oss << ", " << dump(*it);
         		}
         		oss << "]";
-
         		return oss.str();
     		}
 
@@ -105,7 +104,6 @@ class JsonStream {
             			oss << ", " << dump_pair(*it);
         		}
         		oss << "}";
-
         		return oss.str();
     		}
 
@@ -121,6 +119,7 @@ class JsonStream {
 		JsonStream& operator<<(const T& data) {
 			if (_stream.is_open()) {
 				_stream << dump(data);
+				_stream << "\n";
 			}
 			return *this;
 		}
